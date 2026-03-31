@@ -1,7 +1,6 @@
 import pytest
 from tdc.config.models import (
-    TaskConfig, HTTPSourceConfig, DirectInsertConfig,
-    HTTPConfig, PipelineStepConfig, FieldGeneratorConfig
+    TaskConfig, HTTPConfig, PipelineStepConfig, FieldGeneratorConfig
 )
 from tdc.core.constants import TaskType
 
