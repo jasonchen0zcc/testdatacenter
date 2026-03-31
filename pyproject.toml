@@ -30,3 +30,9 @@ dev = [
 
 [project.scripts]
 tdc = "tdc.cli:main"
+
+[tool.setuptools]
+packages = ["tdc"]
+
+[tool.setuptools.package-dir]
+tdc = "tdc"
