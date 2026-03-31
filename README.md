@@ -19,14 +19,42 @@
 pip install -e ".[dev]"
 ```
 
-### 2. 配置数据库
+### 2. 初始化数据库
 
-编辑 `configs/db.yaml`，配置MySQL实例。
+```bash
+mysql -u root -p < scripts/init_db.sql
+```
 
-### 3. 启动调度器
+### 3. 配置数据库
+
+编辑 `configs/db.yaml`，配置MySQL实例连接信息。
+
+### 4. 启动调度器
 
 ```bash
 tdc scheduler start --config-dir ./configs
+```
+
+## CLI命令
+
+```bash
+# 启动调度器
+tdc scheduler start
+
+# 列出任务
+tdc task list
+
+# 立即执行任务
+tdc task run --task-id example_http
+
+# 验证配置
+tdc config validate --file configs/tasks/example_http.yaml
+```
+
+## Docker部署
+
+```bash
+docker-compose up -d
 ```
 
 ## 项目结构

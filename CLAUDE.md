@@ -4,10 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Context
 
-- **Name**: testdatacenter
-- **Type**: Python project (Python 3.13)
-- **IDE**: PyCharm/IntelliJ IDEA (configured via `.idea/`)
-- **Status**: New/empty project - no source code or build configuration yet established
+- **Name**: testdatacenter / TDC (Test Data Center)
+- **Type**: Python project (Python 3.12+)
+- **IDE**: PyCharm/IntelliJ IDEA
+- **Status**: Active development - TDC core modules implemented
 
 ## Common Commands
 
