@@ -1,0 +1,33 @@
+task_id: "example_user_init"
+task_name: "示例-初始化测试用户"
+task_type: "direct_insert"
+schedule: "0 */6 * * *"
+
+data_template:
+  table: "user_info"
+  batch_size: 100
+  total_count: 1000
+
+  fields:
+    user_id:
+      type: "faker"
+      generator: "uuid4"
+    username:
+      type: "faker"
+      generator: "name"
+    email:
+      type: "faker"
+      generator: "email"
+    status:
+      type: "choice"
+      values: [1, 2, 3]
+      weights: [0.7, 0.2, 0.1]
+
+tag_mapping:
+  user_id: "{{ faker.uuid4 }}"
+  order_id: "N/A"
+  data_tag: "EXAMPLE_INSERT_DATA"
+
+target_db:
+  instance: "user_db_master"
+  database: "user_db"
