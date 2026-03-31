@@ -1,0 +1,2 @@
+# 依赖项请查看 pyproject.toml
+# 安装方式: pip install -e ".[dev]"

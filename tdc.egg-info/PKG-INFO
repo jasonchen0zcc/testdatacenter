@@ -1,0 +1,24 @@
+Metadata-Version: 2.4
+Name: tdc
+Version: 0.1.0
+Summary: Test Data Center - 测试数据生成中心
+Requires-Python: >=3.12
+Requires-Dist: apscheduler>=3.10.0
+Requires-Dist: httpx[http2]>=0.27.0
+Requires-Dist: sqlalchemy[asyncio]>=2.0.0
+Requires-Dist: aiomysql>=0.2.0
+Requires-Dist: pydantic>=2.0.0
+Requires-Dist: pydantic-settings>=2.0.0
+Requires-Dist: jinja2>=3.1.0
+Requires-Dist: faker>=24.0.0
+Requires-Dist: click>=8.0.0
+Requires-Dist: structlog>=24.0.0
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: jsonpath-ng>=1.6.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23.0; extra == "dev"
+Requires-Dist: pytest-cov>=5.0.0; extra == "dev"
+Requires-Dist: black>=24.0.0; extra == "dev"
+Requires-Dist: ruff>=0.3.0; extra == "dev"
+Requires-Dist: mypy>=1.9.0; extra == "dev"
