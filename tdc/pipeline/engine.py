@@ -1,6 +1,8 @@
 from jsonpath_ng import parse
+from typing import Optional
 
 from tdc.config.models import PipelineStepConfig, TaskConfig
+from tdc.config.template_loader import TemplateLoader
 from tdc.core.models import Context, PipelineResult
 from tdc.pipeline.context import ContextManager
 from tdc.pipeline.http_client import HTTPClient
@@ -9,8 +11,9 @@ from tdc.pipeline.http_client import HTTPClient
 class PipelineEngine:
     """管道执行引擎"""
 
-    def __init__(self):
+    def __init__(self, template_loader: Optional[TemplateLoader] = None):
         self.http_client = HTTPClient()
+        self.template_loader = template_loader
 
     async def execute(self, config: TaskConfig, ctx: Context) -> PipelineResult:
         """执行完整的管道"""
@@ -18,7 +21,7 @@ class PipelineEngine:
 
         for step in config.pipeline:
             try:
-                await self.execute_step(step, ctx)
+                await self.execute_step(step, ctx, config.task_id)
                 step_results.append({"step_id": step.step_id, "success": True})
             except Exception as e:
                 step_results.append({"step_id": step.step_id, "success": False, "error": str(e)})
@@ -27,7 +30,7 @@ class PipelineEngine:
 
         return PipelineResult(context=ctx, success=True, step_results=step_results)
 
-    async def execute_step(self, step: PipelineStepConfig, ctx: Context) -> dict:
+    async def execute_step(self, step: PipelineStepConfig, ctx: Context, task_id: str) -> dict:
         """执行单个步骤"""
         manager = ContextManager(ctx)
 
@@ -37,10 +40,18 @@ class PipelineEngine:
             if not condition_result or condition_result.strip() in ("False", "None", ""):
                 return {"skipped": True}
 
-        # 渲染请求体
+        # 加载并渲染请求体
         rendered_body = None
         if step.http.body_template:
-            rendered_body = manager.render_template(step.http.body_template)
+            # 使用 template_loader 加载模板内容（支持文件或内联）
+            if self.template_loader:
+                template_content = self.template_loader.load_body_template(
+                    step.http.body_template, task_id
+                )
+            else:
+                template_content = step.http.body_template
+            # 渲染 Jinja2 模板
+            rendered_body = manager.render_template(template_content)
 
         # 渲染headers中的模板
         headers = manager.render_dict(step.http.headers)

@@ -1,6 +1,7 @@
 import structlog
 
 from tdc.config.models import TaskConfig
+from tdc.config.template_loader import TemplateLoader
 from tdc.core.constants import TaskType
 from tdc.core.models import Context
 from tdc.pipeline.engine import PipelineEngine
@@ -17,6 +18,7 @@ class TaskRouter:
     def __init__(self, pool_manager: MySQLPoolManager, config_loader):
         self.pool_manager = pool_manager
         self.config_loader = config_loader
+        self.template_loader = TemplateLoader(str(config_loader.config_dir))
 
     async def route(self, task_config: TaskConfig):
         """路由任务到对应的执行器"""
@@ -31,7 +33,7 @@ class TaskRouter:
 
     async def _execute_http_source(self, config: TaskConfig):
         """执行HTTP源任务"""
-        engine = PipelineEngine()
+        engine = PipelineEngine(self.template_loader)
         ctx = Context(task_id=config.task_id)
 
         try:
