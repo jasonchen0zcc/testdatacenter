@@ -1,0 +1,7 @@
+{
+  "user_id": "{{ context.get('user_id') }}",
+  "order_no": "ORD{{ faker.random_number(digits=10) }}",
+  "amount": {{ faker.random_int(min=100, max=10000) }},
+  "status": "pending",
+  "created_at": "{{ now.isoformat() }}"
+}

@@ -1,5 +1,5 @@
 task_id: "example_order_flow"
-task_name: "示例-订单全流程构造"
+task_name: "示例-订单全流程构造（外置模板版）"
 task_type: "http_source"
 schedule: "0 2 * * *"
 
@@ -9,17 +9,24 @@ pipeline:
     http:
       url: "https://httpbin.org/post"
       method: POST
-      body_template: |
-        {
-          "username": "{{ faker.name }}",
-          "email": "{{ faker.email }}"
-        }
+      # 使用外置模板文件
+      body_template: "create_user.json"
     extract:
       user_id: "$.json.username"
 
+  - step_id: "create_order"
+    name: "创建订单"
+    http:
+      url: "https://httpbin.org/post"
+      method: POST
+      # 使用外置模板文件，引用上一步提取的 user_id
+      body_template: "create_order.json"
+    extract:
+      order_no: "$.json.order_no"
+
 tag_mapping:
-  user_id: "{{ context.user_id }}"
-  order_id: "N/A"
+  user_id: "{{ context.get('user_id') }}"
+  order_id: "{{ context.get('order_no') }}"
   data_tag: "EXAMPLE_HTTP_DATA"
 
 target_db:
