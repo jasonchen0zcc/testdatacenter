@@ -29,20 +29,21 @@ class ConfigLoader:
             raise ConfigError(f"Tasks directory not found: {tasks_dir}")
 
         configs = []
-        for task_file in tasks_dir.glob("*.yaml"):
+        seen_ids = set()
+        for task_file in tasks_dir.rglob("*.yaml"):
             content = task_file.read_text()
             content = os.path.expandvars(content)
             data = yaml.safe_load(content)
-            configs.append(TaskConfig(**data))
+            task = TaskConfig(**data)
+            if task.task_id in seen_ids:
+                raise ConfigError(f"Duplicate task_id: {task.task_id}")
+            seen_ids.add(task.task_id)
+            configs.append(task)
 
         return configs
 
     def load_task_by_id(self, task_id: str) -> TaskConfig:
-        task_file = self.config_dir / "tasks" / f"{task_id}.yaml"
-        if not task_file.exists():
-            raise ConfigError(f"Task config not found: {task_file}")
-
-        content = task_file.read_text()
-        content = os.path.expandvars(content)
-        data = yaml.safe_load(content)
-        return TaskConfig(**data)
+        for task in self.load_task_configs():
+            if task.task_id == task_id:
+                return task
+        raise ConfigError(f"Task config not found: {task_id}")
