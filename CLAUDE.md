@@ -68,12 +68,21 @@ python -m unittest discover -s tests
 ```
 tdc/
 ├── core/           # 领域模型、常量、异常定义
-├── config/         # 配置加载与验证（Pydantic models）
+├── config/         # 配置加载与验证（Pydantic models, TemplateLoader）
 ├── scheduler/      # APScheduler 任务调度
 ├── pipeline/       # HTTP 管道执行（含模板渲染）
 ├── generator/      # Faker 数据生成
 └── storage/        # MySQL 连接池与批量写入
 ```
+
+### Key Components
+
+| Component | File | Responsibility |
+|-----------|------|----------------|
+| `TemplateLoader` | `tdc/config/template_loader.py` | 解析 body_template 路径，加载外部模板文件 |
+| `PipelineEngine` | `tdc/pipeline/engine.py` | 执行 HTTP 管道，调用 TemplateLoader 获取模板内容 |
+| `TaskRouter` | `tdc/scheduler/router.py` | 初始化 TemplateLoader 并传递给 PipelineEngine |
+| `ContextManager` | `tdc/pipeline/context.py` | 渲染 Jinja2 模板（faker, context, now 变量）|
 
 ### Configuration Structure
 
@@ -93,6 +102,29 @@ configs/
 1. **简写**: `body_template: "create_user.json"` → 自动解析为 `templates/{task_id}/create_user.json`
 2. **相对路径**: `body_template: "./orders/create.json"` → 基于当前 task 目录
 3. **内联**: `body_template: "{{...}}"` → 直接作为模板字符串（向后兼容）
+
+### Template Loading Flow
+
+```
+TaskConfig (YAML)
+    │
+    ▼
+PipelineEngine.execute_step(step, ctx, task_id)
+    │
+    ├─► TemplateLoader.load_body_template(template_ref, task_id)
+    │       │
+    │       ├─► 以 .json 结尾? ──No──► 返回原字符串（内联模板）
+    │       │
+    │       └─► Yes ──► _resolve_path() ──► 读取文件内容
+    │                   │
+    │                   ├── 纯文件名 ───► templates/{task_id}/{filename}
+    │                   ├── ./ 开头 ───► templates/{task_id}/{relative_path}
+    │                   └── 其他路径 ───► 相对 config_dir 解析
+    │
+    └─► ContextManager.render_template(template_content)
+            │
+            └─► Jinja2 渲染（提供 faker, context, now 变量）
+```
 
 ## Development Workflow
 

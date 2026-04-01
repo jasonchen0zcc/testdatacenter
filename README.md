@@ -6,6 +6,7 @@
 
 - **定时调度**: 基于Cron表达式的任务调度
 - **HTTP管道**: 支持多接口链式调用，上下文传递
+- **外置模板**: HTTP body 支持 JSON 文件外置，简化复杂请求体维护
 - **数据生成**: 基于Faker的数据模板生成
 - **批量写入**: MySQL批量插入优化
 - **数据标记**: 独立标记表，支持测试数据追溯
@@ -94,15 +95,38 @@ tdc config validate --file configs/tasks/example_http.yaml
 docker-compose up -d
 ```
 
+## 设计文档
+
+| 文档 | 说明 |
+|------|------|
+| [HTTP Body 模板外置化设计](docs/superpowers/specs/2026-04-01-http-body-template-externalization-design.md) | body_template 文件化方案（简写/相对路径/内联） |
+| [CLAUDE.md](CLAUDE.md) | 项目架构、开发流程、技能工作流 |
+
 ## 项目结构
+
+### 代码结构
 
 ```
 tdc/
-├── core/           # 核心模型和常量
-├── config/         # 配置管理
-├── scheduler/      # 调度器
-├── pipeline/       # HTTP管道执行
-├── generator/      # 数据生成
-├── storage/        # 存储层
-└── cli.py          # 命令行入口
+├── core/              # 领域模型和常量
+├── config/            # 配置管理（含 TemplateLoader）
+├── scheduler/         # 调度器
+├── pipeline/          # HTTP管道执行（模板渲染）
+├── generator/         # 数据生成
+├── storage/           # 存储层
+└── cli.py             # 命令行入口
+```
+
+### 配置结构
+
+```
+configs/
+├── db.yaml                    # 数据库连接配置
+├── tasks/                     # 任务定义（YAML）
+│   ├── example_http.yaml
+│   └── example_insert.yaml
+└── templates/                 # HTTP body 模板（JSON + Jinja2）
+    └── {task_id}/
+        ├── {step_id}.json
+        └── ...
 ```
