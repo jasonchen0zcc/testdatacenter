@@ -61,6 +61,39 @@ python -m unittest discover -s tests
 | Java review | everything-claude-code:java-review | Java code changes |
 | Python review | everything-claude-code:python-review | Python code changes |
 
+## Architecture Overview
+
+### Core Modules
+
+```
+tdc/
+├── core/           # 领域模型、常量、异常定义
+├── config/         # 配置加载与验证（Pydantic models）
+├── scheduler/      # APScheduler 任务调度
+├── pipeline/       # HTTP 管道执行（含模板渲染）
+├── generator/      # Faker 数据生成
+└── storage/        # MySQL 连接池与批量写入
+```
+
+### Configuration Structure
+
+```
+configs/
+├── db.yaml              # 数据库连接配置
+├── tasks/               # 任务定义（YAML）
+│   ├── example_http.yaml
+│   └── example_insert.yaml
+└── templates/           # HTTP body 模板（JSON + Jinja2）
+    └── {task_id}/
+        ├── {step_id}.json
+        └── ...
+```
+
+**模板支持三种引用方式**（详见设计文档 `docs/superpowers/specs/2026-04-01-http-body-template-externalization-design.md`）：
+1. **简写**: `body_template: "create_user.json"` → 自动解析为 `templates/{task_id}/create_user.json`
+2. **相对路径**: `body_template: "./orders/create.json"` → 基于当前 task 目录
+3. **内联**: `body_template: "{{...}}"` → 直接作为模板字符串（向后兼容）
+
 ## Development Workflow
 
 ### Feature Development Flow

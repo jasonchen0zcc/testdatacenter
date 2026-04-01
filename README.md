@@ -29,7 +29,44 @@ mysql -u root -p < scripts/init_db.sql
 
 编辑 `configs/db.yaml`，配置MySQL实例连接信息。
 
-### 4. 启动调度器
+### 4. 创建 HTTP 任务
+
+**方式A：外置模板文件（推荐用于复杂 body）**
+
+创建 `configs/templates/order_flow/create_user.json`：
+```json
+{
+  "username": "{{ faker.name }}",
+  "email": "{{ faker.email }}",
+  "phone": "{{ faker.phone_number }}"
+}
+```
+
+在 `configs/tasks/order_flow.yaml` 中引用：
+```yaml
+task_id: "order_flow"
+task_type: "http_source"
+schedule: "0 2 * * *"
+pipeline:
+  - step_id: "create_user"
+    http:
+      url: "https://api.example.com/users"
+      method: POST
+      body_template: "create_user.json"  # 简写，自动解析路径
+```
+
+**方式B：内联模板（适合简单 body）**
+```yaml
+pipeline:
+  - step_id: "simple_step"
+    http:
+      url: "https://api.example.com/simple"
+      method: POST
+      body_template: |
+        {"message": "{{ faker.word }}"}
+```
+
+### 5. 启动调度器
 
 ```bash
 tdc scheduler start --config-dir ./configs
