@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from tdc.storage.tag_store import TagStore
+from tdc.storage.task_log import TaskLogger
 from tdc.core.models import Context
 from tdc.config.models import TagMappingConfig
 
@@ -10,9 +11,11 @@ from tdc.config.models import TagMappingConfig
 class BatchInserter:
     """批量插入器"""
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, database: str = "tdc"):
         self.session = session
+        self.database = database
         self.tag_store = TagStore(session)
+        self.task_logger = TaskLogger(session, database)
 
     async def insert_records(
         self,

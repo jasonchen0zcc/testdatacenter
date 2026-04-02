@@ -36,20 +36,50 @@ class TaskRouter:
         engine = PipelineEngine(self.template_loader)
         ctx = Context(task_id=config.task_id)
 
-        try:
-            result = await engine.execute(config, ctx)
+        session_maker = self.pool_manager.get_session_maker(config.target_db.instance)
+        async with session_maker() as session:
+            async with session.begin():
+                inserter = BatchInserter(session, config.target_db.database)
 
-            # 保存标记
-            if result.success and config.tag_mapping:
-                session_maker = self.pool_manager.get_session_maker(config.target_db.instance)
-                async with session_maker() as session:
-                    async with session.begin():
-                        inserter = BatchInserter(session)
+                # 记录任务开始
+                iterations = config.execution.iterations if config.execution else 1
+                log_id = await inserter.task_logger.start_task(
+                    task_id=config.task_id,
+                    task_name=config.task_name,
+                    task_type=config.task_type.value,
+                    total_count=iterations
+                )
+
+                try:
+                    result = await engine.execute(config, ctx)
+
+                    # 计算成功/失败数量
+                    step_results = result.step_results if hasattr(result, 'step_results') else []
+                    success_count = sum(1 for r in step_results if r.get('success', False))
+                    failed_count = len(step_results) - success_count
+
+                    # 保存标记
+                    if result.success and config.tag_mapping:
                         await inserter.tag_store.save_tags(ctx, config.tag_mapping, config.target_db.database)
 
-            return result
-        finally:
-            await engine.close()
+                    # 记录任务完成
+                    await inserter.task_logger.complete_task(
+                        success_count=success_count,
+                        failed_count=failed_count,
+                        error_msg=result.error if hasattr(result, 'error') else None
+                    )
+
+                    return result
+                except Exception as e:
+                    # 记录任务失败
+                    await inserter.task_logger.complete_task(
+                        success_count=0,
+                        failed_count=iterations,
+                        error_msg=str(e)[:500]
+                    )
+                    raise
+                finally:
+                    await engine.close()
 
     async def _execute_direct_insert(self, config: TaskConfig):
         """执行直接插入任务"""
@@ -59,14 +89,37 @@ class TaskRouter:
         session_maker = self.pool_manager.get_session_maker(config.target_db.instance)
         async with session_maker() as session:
             async with session.begin():
-                inserter = BatchInserter(session)
+                inserter = BatchInserter(session, config.target_db.database)
                 ctx = Context(task_id=config.task_id)
 
-                await inserter.insert_records(
-                    config.data_template.table,
-                    records,
-                    ctx,
-                    config.tag_mapping
+                # 记录任务开始
+                log_id = await inserter.task_logger.start_task(
+                    task_id=config.task_id,
+                    task_name=config.task_name,
+                    task_type=config.task_type.value,
+                    total_count=len(records)
                 )
 
-        return {"success": True, "records_count": len(records)}
+                try:
+                    await inserter.insert_records(
+                        config.data_template.table,
+                        records,
+                        ctx,
+                        config.tag_mapping
+                    )
+
+                    # 记录任务完成
+                    await inserter.task_logger.complete_task(
+                        success_count=len(records),
+                        failed_count=0
+                    )
+
+                    return {"success": True, "records_count": len(records)}
+                except Exception as e:
+                    # 记录任务失败
+                    await inserter.task_logger.complete_task(
+                        success_count=0,
+                        failed_count=len(records),
+                        error_msg=str(e)[:500]
+                    )
+                    raise
