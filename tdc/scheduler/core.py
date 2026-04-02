@@ -44,6 +44,9 @@ class TDScheduler:
         """调度单个任务"""
         trigger = CronTrigger.from_crontab(task.schedule)
 
+        # 计算超时时间（秒）
+        timeout = task.timeout if task.timeout else 300
+
         self.scheduler.add_job(
             self._execute_task,
             trigger=trigger,
@@ -51,16 +54,27 @@ class TDScheduler:
             name=task.task_name,
             args=[task],
             replace_existing=True,
-            misfire_grace_time=300
+            misfire_grace_time=300,
+            max_instances=1,  # 防止同一任务并发执行
+            coalesce=True,    # 错过多个执行点时合并为一次
         )
 
     async def _execute_task(self, task: TaskConfig):
-        """执行任务包装器"""
+        """执行任务包装器（带超时控制）"""
         logger.info("task_started", task_id=task.task_id)
 
         try:
-            result = await self.router.route(task)
+            # 获取任务超时时间（默认5分钟）
+            timeout = task.timeout if task.timeout else 300
+
+            # 使用 asyncio.wait_for 实现超时控制
+            result = await asyncio.wait_for(
+                self.router.route(task),
+                timeout=timeout
+            )
             logger.info("task_completed", task_id=task.task_id, result=result)
+        except asyncio.TimeoutError:
+            logger.error("task_timeout", task_id=task.task_id, timeout=timeout)
         except Exception as e:
             logger.error("task_failed", task_id=task.task_id, error=str(e))
 

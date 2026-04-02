@@ -41,6 +41,11 @@ class TaskRouter:
             async with session.begin():
                 inserter = BatchInserter(session, config.target_db.database)
 
+                # 检查是否有运行中的任务（分布式锁）
+                if await inserter.task_logger.is_task_running(config.task_id):
+                    logger.warning("task_already_running", task_id=config.task_id)
+                    return {"skipped": True, "reason": "task_already_running"}
+
                 # 记录任务开始
                 iterations = config.execution.iterations if config.execution else 1
                 log_id = await inserter.task_logger.start_task(

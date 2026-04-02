@@ -14,6 +14,20 @@ class TaskLogger:
         self.database = database
         self.log_id: Optional[int] = None
 
+    async def is_task_running(self, task_id: str) -> bool:
+        """Check if a task is currently running (distributed lock)."""
+        table_name = f"{self.database}.tdc_task_log"
+
+        result = await self.session.execute(
+            text(f"""
+                SELECT COUNT(*) FROM {table_name}
+                WHERE task_id = :task_id AND status = 'running'
+            """),
+            {"task_id": task_id}
+        )
+        count = result.scalar()
+        return count > 0
+
     async def start_task(
         self,
         task_id: str,
