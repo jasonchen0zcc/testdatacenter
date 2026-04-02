@@ -16,12 +16,10 @@ execution:
     url: "http://8.137.20.173:8001/user-info"
     method: "POST"
     body: '{"page": 1, "size": 10}'
-    user_path: "data"
+    user_path: "data"        # JSONPath: 用户列表在 data 字段
     single_user: true
     headers:
       Content-Type: "application/json"
-    user_path: "data"        # JSONPath: 用户列表在 data 字段
-    user_field: "userId"     # 用户标识字段（实际会用整个用户对象）
   delay_ms: 100              # 每次迭代延迟100ms
   # 并发控制配置
   concurrency: 2             # 并发执行2个迭代
