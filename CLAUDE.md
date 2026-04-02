@@ -189,6 +189,47 @@ configs/
 - `schedule`: Cron 表达式（如 `0 2 * * *` 每天2点）
 - `timeout`: 任务执行超时（秒，默认300）
 - `enabled`: 是否启用（true/false）
+- `tag_mapping`: 数据标记映射（关联 tdc_data_tag 表）
+
+### Data Tag Association
+
+**Table Relationship**:
+```
+tdc_task_log (1) ──────< (N) tdc_data_tag
+    id                          task_log_id (FK)
+    task_id ──────────────────> task_id
+```
+
+**Query Examples**:
+```sql
+-- 查询某次执行产生的所有数据
+SELECT t.* 
+FROM tdc_data_tag t
+WHERE t.task_log_id = 123;
+
+-- 关联查询执行详情和数据
+SELECT 
+    l.id as execution_id,
+    l.task_id,
+    l.status,
+    l.started_at,
+    t.user_id,
+    t.order_id,
+    t.data_tag
+FROM tdc_task_log l
+LEFT JOIN tdc_data_tag t ON l.id = t.task_log_id
+WHERE l.id = 123;
+
+-- 统计某次执行实际产生的数据量
+SELECT 
+    l.id,
+    l.task_id,
+    COUNT(t.id) as actual_data_count
+FROM tdc_task_log l
+LEFT JOIN tdc_data_tag t ON l.id = t.task_log_id
+WHERE l.id = 123
+GROUP BY l.id;
+```
 
 ### Execution Configuration
 
