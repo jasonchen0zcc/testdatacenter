@@ -44,3 +44,7 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Claude-generated docs (keep only CLAUDE.md and README.md)
+docs/superpowers/plans/
+docs/superpowers/specs/
