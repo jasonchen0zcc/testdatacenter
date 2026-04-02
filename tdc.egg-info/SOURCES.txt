@@ -1,7 +1,0 @@
-pyproject.toml
-tdc.egg-info/PKG-INFO
-tdc.egg-info/SOURCES.txt
-tdc.egg-info/dependency_links.txt
-tdc.egg-info/entry_points.txt
-tdc.egg-info/requires.txt
-tdc.egg-info/top_level.txt
