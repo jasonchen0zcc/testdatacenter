@@ -170,6 +170,32 @@ configs/
 - `data_template`: 数据生成模板（direct_insert 专用）
 - `execution`: 批量执行配置（iterations, user_source, delay_ms）
 - `gateway`: 网关认证配置（auth_url, body_template, token_path）
+- `schedule`: Cron 表达式（如 `0 2 * * *` 每天2点）
+- `timeout`: 任务执行超时（秒，默认300）
+- `enabled`: 是否启用（true/false）
+
+### Multi-Task Support
+
+**Capabilities**:
+- Unlimited tasks in `configs/tasks/` directory
+- Independent cron schedule per task
+- Isolated execution (one task failure doesn't affect others)
+- Automatic duplicate task_id detection on startup
+- Mixed task types support (http_source + direct_insert)
+
+**Concurrency Control**:
+- `max_instances=1`: Prevents same task from concurrent execution
+- `coalesce=True`: Merges missed executions into single run
+- Database-level lock: Checks `running` status in `tdc_task_log`
+- Task timeout: Configurable per task (default 300s)
+
+**Cron Schedule Examples**:
+```yaml
+schedule: "*/5 * * * *"    # Every 5 minutes
+schedule: "0 */2 * * *"    # Every 2 hours
+schedule: "0 2 * * *"      # Daily at 2:00 AM
+schedule: "0 9 * * 1-5"    # Weekdays at 9:00 AM
+```
 
 **模板支持三种引用方式**（详见设计文档 `docs/superpowers/specs/2026-04-01-http-body-template-externalization-design.md`）：
 1. **简写**: `body_template: "create_user.json"` → 自动解析为 `templates/{task_id}/create_user.json`
