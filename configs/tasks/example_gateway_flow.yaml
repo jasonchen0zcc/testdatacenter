@@ -1,0 +1,48 @@
+task_id: "example_gateway_flow"
+task_name: "网关认证批量下单示例"
+task_type: "http_source"
+schedule: "0 2 * * *"
+enabled: true
+target_db:
+  instance: "default"
+  database: "test_db"
+
+# 批量执行：10 个不同用户
+execution:
+  iterations: 10
+  user_source: "faker"
+  user_template: "{{ faker.user_name }}"
+  delay_ms: 500
+
+# 网关认证
+gateway:
+  auth_url: "https://gateway.example.com/oauth/token"
+  method: POST
+  body_template: "auth.json"
+  token_path: "data.access_token"
+  header_name: "Authorization"
+  header_prefix: "Bearer "
+  headers:
+    Content-Type: "application/json"
+
+# 业务流程
+pipeline:
+  - step_id: "create_order"
+    name: "创建订单"
+    http:
+      url: "https://api.example.com/orders"
+      method: POST
+      body_template: "create_order.json"
+      headers:
+        Content-Type: "application/json"
+    extract:
+      order_id: "data.order_id"
+
+  - step_id: "confirm_order"
+    name: "确认订单"
+    condition: "{{ context.order_id }}"
+    http:
+      url: "https://api.example.com/orders/{{ context.order_id }}/confirm"
+      method: PUT
+      headers:
+        Content-Type: "application/json"

@@ -28,3 +28,11 @@ class PipelineResult:
     success: bool = True
     error: Optional[str] = None
     step_results: list = field(default_factory=list)
+
+
+@dataclass
+class ExecutionContext:
+    """单次迭代的执行上下文"""
+    iteration: int          # 当前迭代序号（0-based）
+    user: str               # 当前用户
+    total: int              # 总迭代次数
