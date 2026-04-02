@@ -11,22 +11,74 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Common Commands
 
-Since this is a new Python project, you may need to set up:
+### Setup
 
 ```bash
-# Create a virtual environment
+# Create and activate virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 
-# Install dependencies (once requirements.txt or pyproject.toml is created)
-pip install -r requirements.txt
+# Install with dev dependencies
+pip install -e ".[dev]"
+```
 
-# Run Python scripts
-python <script.py>
+### Environment Variables
 
-# Run tests (once test framework is configured)
+```bash
+# Database credentials (required)
+export TDC_DB_PASSWORD="your_password"
+export TDC_DB_USER="root"  # optional, defaults to 'root'
+
+# Or run with env prefix
+TDC_DB_PASSWORD="your_password" tdc scheduler start
+```
+
+### Testing
+
+```bash
+# Run all tests
 pytest
-python -m unittest discover -s tests
+
+# Run specific test file
+pytest tests/unit/test_engine.py
+
+# Run specific test class
+pytest tests/unit/test_engine.py::TestPipelineEngine
+
+# Run specific test method
+pytest tests/unit/test_engine.py::TestPipelineEngine::test_execute_step_success
+
+# Run with coverage
+pytest --cov=tdc --cov-report=term-missing
+```
+
+### Code Quality
+
+```bash
+# Format code
+black tdc/ tests/
+
+# Lint
+ruff check tdc/ tests/
+
+# Type check
+mypy tdc/
+```
+
+### CLI
+
+```bash
+# Start scheduler
+tdc scheduler start --config-dir ./configs
+
+# List tasks
+tdc task list
+
+# Run task immediately
+tdc task run --task-id example_http
+
+# Validate config
+tdc config validate --file configs/tasks/example_http.yaml
 ```
 
 ## Skills Workflow
@@ -80,9 +132,11 @@ tdc/
 | Component | File | Responsibility |
 |-----------|------|----------------|
 | `TemplateLoader` | `tdc/config/template_loader.py` | 解析 body_template 路径，加载外部模板文件 |
-| `PipelineEngine` | `tdc/pipeline/engine.py` | 执行 HTTP 管道，调用 TemplateLoader 获取模板内容 |
+| `PipelineEngine` | `tdc/pipeline/engine.py` | 执行 HTTP 管道，支持多轮迭代和网关认证 |
 | `TaskRouter` | `tdc/scheduler/router.py` | 初始化 TemplateLoader 并传递给 PipelineEngine |
-| `ContextManager` | `tdc/pipeline/context.py` | 渲染 Jinja2 模板（faker, context, now 变量）|
+| `ContextManager` | `tdc/pipeline/context.py` | 渲染 Jinja2 模板（faker, context, now, execution 变量）|
+| `GatewayAuth` | `tdc/pipeline/gateway_auth.py` | 网关认证管理，获取并注入 token |
+| `UserProvider` | `tdc/pipeline/user_provider.py` | 提供用户数据（faker/http/list 三种来源）|
 
 ### Configuration Structure
 
@@ -98,10 +152,26 @@ configs/
         └── ...
 ```
 
+**Task Config Key Fields**:
+- `task_type`: `http_source` | `direct_insert`
+- `pipeline`: HTTP 步骤列表（http_source 专用）
+- `data_template`: 数据生成模板（direct_insert 专用）
+- `execution`: 批量执行配置（iterations, user_source, delay_ms）
+- `gateway`: 网关认证配置（auth_url, body_template, token_path）
+
 **模板支持三种引用方式**（详见设计文档 `docs/superpowers/specs/2026-04-01-http-body-template-externalization-design.md`）：
 1. **简写**: `body_template: "create_user.json"` → 自动解析为 `templates/{task_id}/create_user.json`
 2. **相对路径**: `body_template: "./orders/create.json"` → 基于当前 task 目录
 3. **内联**: `body_template: "{{...}}"` → 直接作为模板字符串（向后兼容）
+
+**模板变量**（由 `ContextManager` 提供）：
+- `faker` - Faker 实例（`faker.name`, `faker.email`, `faker.username` 等）
+- `context` - 管道执行上下文（通过 `extract` 设置的变量）
+- `now` - 当前时间 datetime 对象
+- `execution` - 单次迭代执行上下文
+  - `execution.user` - 当前用户
+  - `execution.iteration` - 当前迭代序号（0-based）
+  - `execution.total` - 总迭代次数
 
 ### Template Loading Flow
 
@@ -109,7 +179,7 @@ configs/
 TaskConfig (YAML)
     │
     ▼
-PipelineEngine.execute_step(step, ctx, task_id)
+PipelineEngine.execute_step(step, ctx, task_id, execution, gateway_auth)
     │
     ├─► TemplateLoader.load_body_template(template_ref, task_id)
     │       │
@@ -121,9 +191,40 @@ PipelineEngine.execute_step(step, ctx, task_id)
     │                   ├── ./ 开头 ───► templates/{task_id}/{relative_path}
     │                   └── 其他路径 ───► 相对 config_dir 解析
     │
-    └─► ContextManager.render_template(template_content)
+    ├─► ContextManager.render_template_with_execution(template, execution)
+    │       │
+    │       └─► Jinja2 渲染（提供 faker, context, now, execution 变量）
+    │               └── execution.user, execution.iteration, execution.total
+    │
+    └─► gateway_auth.apply_to_request(headers) ──► 注入认证 token
+```
+
+### Pipeline Execution Flow (with Iterations)
+
+```
+PipelineEngine.execute(config, ctx)
+    │
+    ├─► UserProvider.initialize()
+    │       ├── user_source=faker ──► 延迟生成（无需初始化）
+    │       ├── user_source=http ──► 从 HTTP 接口预取用户列表
+    │       └── user_source=list ──► 使用配置的静态列表
+    │
+    └─► For iteration in range(execution.iterations):
             │
-            └─► Jinja2 渲染（提供 faker, context, now 变量）
+            ├─► user = UserProvider.get_user(iteration)
+            │       └── faker 模式每次渲染模板；http/list 模式循环使用列表
+            │
+            ├─► Create ExecutionContext(iteration, user, total)
+            │
+            ├─► GatewayAuth.authenticate(execution) ──► 获取 token
+            │       ├── 渲染 auth body_template（可访问 execution.user）
+            │       ├── 发送认证请求
+            │       └── JSONPath 提取 token
+            │
+            └─► Execute pipeline steps
+                    ├── 渲染 step body_template（含 execution 变量）
+                    ├── 注入 gateway token 到 headers
+                    └── 执行 HTTP 请求，extract 字段到 context
 ```
 
 ## Development Workflow
