@@ -41,3 +41,19 @@ class ContextManager:
             else:
                 result[key] = value
         return result
+
+    def render_template_with_execution(
+        self,
+        template_str: str,
+        execution: "ExecutionContext"
+    ) -> str:
+        """渲染模板，支持 execution 变量"""
+        from tdc.core.models import ExecutionContext
+
+        template = self.env.from_string(template_str)
+        return template.render(
+            context=self.context,
+            faker=self.faker,
+            now=datetime.now(),
+            execution=execution
+        )
