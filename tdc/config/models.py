@@ -111,7 +111,12 @@ class ExecutionConfig(BaseModel):
     user_http: Optional[UserHttpConfig] = None
     # list 模式
     user_list: Optional[List[str]] = None
-    delay_ms: int = 0  # 0 表示无延迟
+    delay_ms: int = 0  # 每次迭代延迟（毫秒）
+    # 并发控制
+    concurrency: int = 1  # 并发数，默认1（串行）
+    batch_delay_ms: int = 0  # 每批完成后延迟（毫秒）
+    fail_fast: bool = False  # true=任一失败立即停止
+    continue_on_error: bool = True  # 单迭代失败是否继续下一迭代
 
 
 class TaskConfig(BaseModel):

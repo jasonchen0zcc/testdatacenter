@@ -5,6 +5,7 @@ from jsonpath_ng import parse
 
 from tdc.config.models import ExecutionConfig, PipelineStepConfig, TaskConfig
 from tdc.config.template_loader import TemplateLoader
+from tdc.core.execution_stats import ExecutionStats
 from tdc.core.models import Context, ExecutionContext, PipelineResult
 from tdc.pipeline.context import ContextManager
 from tdc.pipeline.gateway_auth import GatewayAuth
@@ -20,71 +21,113 @@ class PipelineEngine:
         self.template_loader = template_loader
 
     async def execute(self, config: TaskConfig, ctx: Context) -> PipelineResult:
-        """执行完整的管道"""
+        """执行完整的管道（支持并发控制）"""
         execution_config = config.execution or ExecutionConfig()
-        step_results = []
+        stats = ExecutionStats(total=execution_config.iterations)
 
         # 初始化用户提供者
         context_manager = ContextManager(ctx)
         user_provider = UserProvider(execution_config, context_manager)
         user_provider.initialize()
 
+        # 创建并发控制信号量
+        concurrency = max(1, execution_config.concurrency)
+        semaphore = asyncio.Semaphore(concurrency)
+
+        # 创建所有迭代任务
+        tasks = []
         for i in range(execution_config.iterations):
-            # 获取当前用户
-            user = user_provider.get_user(i)
-
-            # 创建执行上下文
-            execution = ExecutionContext(
-                iteration=i,
-                user=user,
-                total=execution_config.iterations
+            task = self._execute_iteration(
+                i, execution_config, user_provider, config,
+                ctx, context_manager, semaphore, stats
             )
+            tasks.append(task)
 
-            # 将 execution 存入 context 供后续使用（如 tag_mapping）
-            ctx.set("_execution", execution)
+        # 执行所有任务
+        if concurrency == 1:
+            # 串行执行
+            for task in tasks:
+                await task
+        else:
+            # 并发执行
+            await asyncio.gather(*tasks, return_exceptions=True)
 
-            # 网关认证（如果配置）
-            gateway_auth = None
-            if config.gateway and self.template_loader:
-                gateway_auth = GatewayAuth(
-                    config.gateway,
-                    config.task_id,
-                    self.template_loader,
-                    context_manager
-                )
-                try:
-                    await gateway_auth.authenticate(execution)
-                except Exception as e:
-                    step_results.append({
-                        "iteration": i,
-                        "step_id": "gateway_auth",
-                        "success": False,
-                        "error": str(e)
-                    })
-                    if config.on_failure.action == "stop":
-                        return PipelineResult(
-                            context=ctx,
-                            success=False,
-                            error=str(e),
-                            step_results=step_results
-                        )
-                    continue  # on_failure == "continue" 时跳过本次迭代
-
-            # 执行 pipeline steps
-            iteration_results = await self._execute_pipeline(
-                config.pipeline, ctx, execution, gateway_auth, config.task_id
-            )
-            step_results.extend(iteration_results)
-
-            # 延迟（非最后一次）
-            if i < execution_config.iterations - 1 and execution_config.delay_ms > 0:
-                await asyncio.sleep(execution_config.delay_ms / 1000)
-
+        # 构建结果
+        success = stats.failed == 0 and stats.completed == stats.total
         return PipelineResult(
             context=ctx,
-            success=all(r.get("success", True) for r in step_results),
-            step_results=step_results
+            success=success,
+            error=None if success else f"Completed {stats.completed}/{stats.total}, failed: {stats.failed}",
+            step_results=[stats.to_dict()]
         )
+
+    async def _execute_iteration(
+        self,
+        iteration: int,
+        execution_config: ExecutionConfig,
+        user_provider: UserProvider,
+        config: TaskConfig,
+        ctx: Context,
+        context_manager: ContextManager,
+        semaphore: asyncio.Semaphore,
+        stats: ExecutionStats
+    ):
+        """执行单次迭代（带并发控制）"""
+        async with semaphore:
+            try:
+                # 获取当前用户
+                user = user_provider.get_user(iteration)
+
+                # 创建执行上下文
+                execution = ExecutionContext(
+                    iteration=iteration,
+                    user=user,
+                    total=execution_config.iterations
+                )
+
+                # 将 execution 存入 context 供后续使用（如 tag_mapping）
+                # 使用固定键名，存储最后一次迭代的 execution
+                ctx.set("_execution", execution)
+
+                # 网关认证（如果配置）
+                gateway_auth = None
+                if config.gateway and self.template_loader:
+                    gateway_auth = GatewayAuth(
+                        config.gateway,
+                        config.task_id,
+                        self.template_loader,
+                        context_manager
+                    )
+                    try:
+                        await gateway_auth.authenticate(execution)
+                    except Exception as e:
+                        stats.add_result(iteration, False, f"gateway_auth: {e}")
+                        if execution_config.fail_fast:
+                            raise
+                        return
+
+                # 执行 pipeline steps
+                iteration_results = await self._execute_pipeline(
+                    config.pipeline, ctx, execution, gateway_auth, config.task_id
+                )
+
+                # 检查步骤结果
+                all_success = all(r.get("success", True) for r in iteration_results)
+                error_msg = None
+                if not all_success:
+                    failed_steps = [r for r in iteration_results if not r.get("success", True)]
+                    error_msg = f"steps failed: {[s.get('step_id') for s in failed_steps]}"
+
+                stats.add_result(iteration, all_success, error_msg)
+
+                # 单次迭代延迟
+                if iteration < execution_config.iterations - 1 and execution_config.delay_ms > 0:
+                    await asyncio.sleep(execution_config.delay_ms / 1000)
+
+            except Exception as e:
+                stats.add_result(iteration, False, str(e))
+                if execution_config.fail_fast:
+                    raise
 
     async def _execute_pipeline(
         self,

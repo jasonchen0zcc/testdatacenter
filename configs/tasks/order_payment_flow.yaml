@@ -22,7 +22,12 @@ execution:
       Content-Type: "application/json"
     user_path: "data"        # JSONPath: 用户列表在 data 字段
     user_field: "userId"     # 用户标识字段（实际会用整个用户对象）
-  delay_ms: 1000             # 每次迭代间隔1秒
+  delay_ms: 100              # 每次迭代延迟100ms
+  # 并发控制配置
+  concurrency: 2             # 并发执行2个迭代
+  batch_delay_ms: 500        # 每批完成后延迟500ms
+  fail_fast: false           # 不快速失败，继续执行其他迭代
+  continue_on_error: true    # 单个迭代失败继续执行
 
 # 网关认证：兑换token
 # 每个用户使用自己的 userId 和 mobile 兑换token

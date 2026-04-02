@@ -2,31 +2,23 @@ import asyncio
 import os
 from pathlib import Path
 import click
-import structlog
 
 from tdc.scheduler.core import TDScheduler
 from tdc.config.loader import ConfigLoader, load_dotenv
+from tdc.core.logger import setup_logging, get_logger
 
 # Auto-load .env file on module import
 load_dotenv()
 
-structlog.configure(
-    processors=[
-        structlog.stdlib.filter_by_level,
-        structlog.stdlib.add_logger_name,
-        structlog.stdlib.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-        structlog.processors.JSONRenderer()
-    ],
-    context_class=dict,
-    logger_factory=structlog.stdlib.LoggerFactory(),
-    wrapper_class=structlog.stdlib.BoundLogger,
-    cache_logger_on_first_use=True,
+# Setup logging (50MB rotation, daily retention)
+setup_logging(
+    log_dir="logs",
+    max_bytes=50 * 1024 * 1024,  # 50MB
+    backup_count=0,  # Only keep current file
+    log_level=os.environ.get("TDC_LOG_LEVEL", "INFO")
 )
 
-logger = structlog.get_logger()
+logger = get_logger()
 
 
 @click.group()
