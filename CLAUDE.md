@@ -22,15 +22,27 @@ source venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-### Environment Variables
+### Configuration (.env file)
 
 ```bash
-# Database credentials (required)
-export TDC_DB_PASSWORD="your_password"
-export TDC_DB_USER="root"  # optional, defaults to 'root'
+# Copy template and edit
+cp .env.example .env
 
-# Or run with env prefix
-TDC_DB_PASSWORD="your_password" tdc scheduler start
+# Edit .env with your database credentials
+TDC_DB_HOST=8.137.20.173
+TDC_DB_PORT=3306
+TDC_DB_USER=root
+TDC_DB_PASSWORD=your_password
+TDC_DB_POOL_SIZE=10
+```
+
+Or use environment variables directly:
+```bash
+export TDC_DB_PASSWORD="your_password"
+tdc scheduler start
+
+# Or inline
+TDC_DB_PASSWORD="your_password" tdc task run --task-id example
 ```
 
 ### Testing
