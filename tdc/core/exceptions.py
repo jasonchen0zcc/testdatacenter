@@ -25,3 +25,20 @@ class HTTPError(TDCError):
 class StorageError(TDCError):
     """存储层错误"""
     pass
+
+
+class GatewayAuthError(PipelineError):
+    """网关认证错误"""
+    def __init__(self, message, status_code=None):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+class TokenExtractionError(PipelineError):
+    """Token 提取错误"""
+    pass
+
+
+class UserSourceError(PipelineError):
+    """用户来源错误"""
+    pass
