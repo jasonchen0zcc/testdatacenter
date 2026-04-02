@@ -93,6 +93,22 @@ tdc task run --task-id example_http
 tdc config validate --file configs/tasks/example_http.yaml
 ```
 
+### Logging
+
+```bash
+# Log files location
+logs/tdc_YYYY-MM-DD.log
+
+# Log features
+- 50MB file size limit (auto rotation)
+- Daily file naming
+- Auto cleanup old logs (keep only today)
+- JSON format for structured logging
+
+# Environment variable
+export TDC_LOG_LEVEL=DEBUG  # DEBUG, INFO, WARNING, ERROR
+```
+
 ## Skills Workflow
 
 ### Core Skills
@@ -168,11 +184,25 @@ configs/
 - `task_type`: `http_source` | `direct_insert`
 - `pipeline`: HTTP 步骤列表（http_source 专用）
 - `data_template`: 数据生成模板（direct_insert 专用）
-- `execution`: 批量执行配置（iterations, user_source, delay_ms）
+- `execution`: 批量执行配置（见下文）
 - `gateway`: 网关认证配置（auth_url, body_template, token_path）
 - `schedule`: Cron 表达式（如 `0 2 * * *` 每天2点）
 - `timeout`: 任务执行超时（秒，默认300）
 - `enabled`: 是否启用（true/false）
+
+### Execution Configuration
+
+```yaml
+execution:
+  iterations: 100          # 总迭代次数
+  user_source: "faker"     # faker | http | list
+  # 并发控制
+  concurrency: 1           # 并发数（默认1串行，>1并发）
+  delay_ms: 100            # 每次迭代延迟（毫秒）
+  batch_delay_ms: 500      # 每批完成后延迟（限流保护）
+  fail_fast: false         # true=任一失败立即停止
+  continue_on_error: true  # 单迭代失败是否继续下一迭代
+```
 
 ### Multi-Task Support
 
