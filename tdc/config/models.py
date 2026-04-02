@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from tdc.core.constants import TaskType, AuthType
@@ -79,6 +79,39 @@ class OnFailureConfig(BaseModel):
     retry: RetryConfig = Field(default_factory=RetryConfig)
 
 
+class GatewayConfig(BaseModel):
+    """网关认证配置"""
+    auth_url: str
+    method: str = "POST"
+    body_template: str
+    token_path: str = "data.access_token"  # JSONPath
+    header_name: str = "Authorization"
+    header_prefix: str = "Bearer "
+    headers: Dict[str, str] = Field(default_factory=dict)
+
+
+class UserHttpConfig(BaseModel):
+    """HTTP 用户来源配置"""
+    url: str
+    method: str = "GET"
+    headers: Dict[str, str] = Field(default_factory=dict)
+    user_path: str = "data"  # JSONPath 提取用户列表
+    user_field: Optional[str] = None  # 从用户对象中提取字段
+
+
+class ExecutionConfig(BaseModel):
+    """批量执行配置"""
+    iterations: int = 1
+    user_source: Literal["faker", "http", "list"] = "faker"
+    # faker 模式
+    user_template: Optional[str] = "{{ faker.username }}"
+    # http 模式
+    user_http: Optional[UserHttpConfig] = None
+    # list 模式
+    user_list: Optional[List[str]] = None
+    delay_ms: int = 0  # 0 表示无延迟
+
+
 class TaskConfig(BaseModel):
     task_id: str
     task_name: str
@@ -92,6 +125,9 @@ class TaskConfig(BaseModel):
     tag_mapping: Optional[TagMappingConfig] = None
     # direct_insert specific
     data_template: Optional[DataTemplateConfig] = None
+    # 新增：网关认证和批量执行配置
+    gateway: Optional[GatewayConfig] = None
+    execution: Optional[ExecutionConfig] = None
     # common
     target_db: TargetDBConfig
 
