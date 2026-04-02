@@ -22,7 +22,8 @@ class BatchInserter:
         table: str,
         records: List[Dict[str, Any]],
         ctx: Context = None,
-        tag_mapping: TagMappingConfig = None
+        tag_mapping: TagMappingConfig = None,
+        task_log_id: int = None
     ):
         """批量插入记录并保存标记"""
         if not records:
@@ -39,6 +40,6 @@ class BatchInserter:
         for record in records:
             await self.session.execute(text(sql), record)
 
-        # 保存标记
+        # 保存标记（传入 task_log_id）
         if ctx and tag_mapping:
-            await self.tag_store.save_tags(ctx, tag_mapping)
+            await self.tag_store.save_tags(ctx, tag_mapping, self.database, task_log_id=task_log_id)

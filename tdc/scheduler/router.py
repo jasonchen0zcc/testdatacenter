@@ -63,9 +63,11 @@ class TaskRouter:
                     success_count = sum(1 for r in step_results if r.get('success', False))
                     failed_count = len(step_results) - success_count
 
-                    # 保存标记
+                    # 保存标记（传入 task_log_id 建立关联）
                     if result.success and config.tag_mapping:
-                        await inserter.tag_store.save_tags(ctx, config.tag_mapping, config.target_db.database)
+                        await inserter.tag_store.save_tags(
+                            ctx, config.tag_mapping, config.target_db.database, task_log_id=log_id
+                        )
 
                     # 记录任务完成
                     await inserter.task_logger.complete_task(
@@ -106,11 +108,14 @@ class TaskRouter:
                 )
 
                 try:
+                    # 将 task_log_id 存入 context，供 insert_records 使用
+                    ctx.set("_task_log_id", log_id)
                     await inserter.insert_records(
                         config.data_template.table,
                         records,
                         ctx,
-                        config.tag_mapping
+                        config.tag_mapping,
+                        task_log_id=log_id
                     )
 
                     # 记录任务完成

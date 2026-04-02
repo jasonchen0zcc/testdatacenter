@@ -18,6 +18,7 @@ class TagStore:
         ctx: Context,
         tag_mapping: TagMappingConfig,
         database: str = None,
+        task_log_id: int = None,
         table_name: str = "tdc_data_tag"
     ):
         """保存标记数据"""
@@ -53,12 +54,16 @@ class TagStore:
 
         # 使用完整表名（包含数据库名）
         full_table_name = f"{database}.{table_name}" if database else table_name
+
+        # 构建 SQL，包含 task_log_id
         sql = text(f"""
-            INSERT INTO {full_table_name} (user_id, order_id, data_tag, task_id, ext_info, created_at)
-            VALUES (:user_id, :order_id, :data_tag, :task_id, :ext_info, :created_at)
+            INSERT INTO {full_table_name}
+            (task_log_id, user_id, order_id, data_tag, task_id, ext_info, created_at)
+            VALUES (:task_log_id, :user_id, :order_id, :data_tag, :task_id, :ext_info, :created_at)
         """)
 
         await self.session.execute(sql, {
+            "task_log_id": task_log_id,
             "user_id": user_id,
             "order_id": order_id,
             "data_tag": data_tag,
