@@ -5,6 +5,7 @@ from jsonpath_ng import parse
 
 from tdc.config.models import ExecutionConfig, PipelineStepConfig, TaskConfig
 from tdc.config.template_loader import TemplateLoader
+from tdc.core.assertions import AssertionValidator
 from tdc.core.execution_stats import ExecutionStats
 from tdc.core.models import Context, ExecutionContext, PipelineResult
 from tdc.pipeline.context import ContextManager
@@ -209,6 +210,12 @@ class PipelineEngine:
 
         # 执行 HTTP 请求
         response = await self.http_client.request(step.http, rendered_body)
+
+        # 【新增】执行粗粒度断言验证
+        if step.assertions:
+            assertion_result = AssertionValidator.validate(response, step.assertions)
+            if not assertion_result.success:
+                raise AssertionError(f"Step '{step.step_id}' assertion failed: {assertion_result.message}")
 
         # 提取字段到上下文
         if step.extract:

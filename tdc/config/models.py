@@ -20,12 +20,25 @@ class HTTPConfig(BaseModel):
     auth: HTTPAuthConfig = Field(default_factory=HTTPAuthConfig)
 
 
+class AssertionConfig(BaseModel):
+    """粗粒度断言配置"""
+    # HTTP 状态码断言（支持单个值或列表）
+    status_code: Optional[Any] = None  # 200 或 [200, 201]
+    # JSON 字段断言
+    json_path: Optional[str] = None           # 字段路径，如 "code"
+    json_expected: Optional[Any] = None       # 期望值，如 200
+    # JSON 布尔成功标识断言
+    json_success_path: Optional[str] = None   # 布尔字段路径，如 "success"
+    json_success_value: bool = True           # 预期值，默认为 true
+
+
 class PipelineStepConfig(BaseModel):
     step_id: str
     name: Optional[str] = None
     condition: Optional[str] = None
     http: HTTPConfig
     extract: Dict[str, str] = Field(default_factory=dict)
+    assertions: Optional[AssertionConfig] = None  # 粗粒度断言配置
 
 
 class FieldGeneratorConfig(BaseModel):
