@@ -9,6 +9,40 @@ from tdc.config.models import TaskConfig, DBConfig
 from tdc.core.exceptions import ConfigError
 
 
+def load_dotenv(project_root: Path = None) -> None:
+    """Load environment variables from .env file if exists"""
+    if project_root is None:
+        # Try to find project root (where .git or pyproject.toml exists)
+        current = Path.cwd()
+        for parent in [current] + list(current.parents):
+            if (parent / ".git").exists() or (parent / "pyproject.toml").exists():
+                project_root = parent
+                break
+
+    if project_root is None:
+        return
+
+    dotenv_file = project_root / ".env"
+    if not dotenv_file.exists():
+        return
+
+    # Parse .env file
+    with open(dotenv_file) as f:
+        for line in f:
+            line = line.strip()
+            # Skip empty lines and comments
+            if not line or line.startswith('#'):
+                continue
+            # Parse KEY=value
+            if '=' in line:
+                key, value = line.split('=', 1)
+                key = key.strip()
+                value = value.strip().strip('"\'')  # Remove quotes
+                # Only set if not already in environment
+                if key not in os.environ:
+                    os.environ[key] = value
+
+
 def expand_env_vars(content: str) -> str:
     """扩展环境变量，支持 ${VAR} 和 ${VAR:-default} 格式"""
     # 匹配 ${VAR:-default} 或 ${VAR}
@@ -26,8 +60,14 @@ def expand_env_vars(content: str) -> str:
 
 
 class ConfigLoader:
+    _dotenv_loaded = False
+
     def __init__(self, config_dir: str):
         self.config_dir = Path(config_dir)
+        # Auto-load .env file on first ConfigLoader instantiation
+        if not ConfigLoader._dotenv_loaded:
+            load_dotenv()
+            ConfigLoader._dotenv_loaded = True
 
     def load_db_config(self) -> DBConfig:
         db_file = self.config_dir / "db.yaml"

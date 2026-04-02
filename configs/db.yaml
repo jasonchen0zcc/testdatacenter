@@ -1,7 +1,7 @@
 instances:
   tdc:
-    host: "8.137.20.173"
-    port: 3306
-    user: "${TDC_DB_USER:-root}"
+    host: "${TDC_DB_HOST}"
+    port: ${TDC_DB_PORT:-3306}
+    user: "${TDC_DB_USER}"
     password: "${TDC_DB_PASSWORD}"
-    pool_size: 10
+    pool_size: ${TDC_DB_POOL_SIZE:-10}

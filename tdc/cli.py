@@ -5,7 +5,10 @@ import click
 import structlog
 
 from tdc.scheduler.core import TDScheduler
-from tdc.config.loader import ConfigLoader
+from tdc.config.loader import ConfigLoader, load_dotenv
+
+# Auto-load .env file on module import
+load_dotenv()
 
 structlog.configure(
     processors=[
