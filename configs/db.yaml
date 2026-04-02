@@ -1,14 +1,7 @@
 instances:
-  biz_db_01:
-    host: "localhost"
+  tdc:
+    host: "8.137.20.173"
     port: 3306
-    user: "${BIZ_DB_USER:-root}"
-    password: "${BIZ_DB_PASS:-password}"
+    user: "${TDC_DB_USER:-root}"
+    password: "${TDC_DB_PASSWORD}"
     pool_size: 10
-
-  user_db_master:
-    host: "localhost"
-    port: 3306
-    user: "${USER_DB_USER:-root}"
-    password: "${USER_DB_PASS:-password}"
-    pool_size: 20

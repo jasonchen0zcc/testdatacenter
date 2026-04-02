@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 from typing import Dict, List
 
@@ -6,6 +7,22 @@ import yaml
 
 from tdc.config.models import TaskConfig, DBConfig
 from tdc.core.exceptions import ConfigError
+
+
+def expand_env_vars(content: str) -> str:
+    """扩展环境变量，支持 ${VAR} 和 ${VAR:-default} 格式"""
+    # 匹配 ${VAR:-default} 或 ${VAR}
+    pattern = re.compile(r'\$\{([^}]+)\}')
+
+    def replace(match):
+        var_expr = match.group(1)
+        if ':-' in var_expr:
+            var_name, default = var_expr.split(':-', 1)
+            return os.environ.get(var_name, default)
+        else:
+            return os.environ.get(var_expr, match.group(0))
+
+    return pattern.sub(replace, content)
 
 
 class ConfigLoader:
@@ -18,8 +35,8 @@ class ConfigLoader:
             raise ConfigError(f"DB config file not found: {db_file}")
 
         content = db_file.read_text()
-        # 环境变量替换
-        content = os.path.expandvars(content)
+        # 环境变量替换（支持 ${VAR} 和 ${VAR:-default} 格式）
+        content = expand_env_vars(content)
         data = yaml.safe_load(content)
         return DBConfig(**data)
 
@@ -32,7 +49,7 @@ class ConfigLoader:
         seen_ids = set()
         for task_file in tasks_dir.rglob("*.yaml"):
             content = task_file.read_text()
-            content = os.path.expandvars(content)
+            content = expand_env_vars(content)
             data = yaml.safe_load(content)
             task = TaskConfig(**data)
             if task.task_id in seen_ids:
