@@ -158,6 +158,9 @@ class PipelineEngine:
         if gateway_auth:
             headers = gateway_auth.apply_to_request(headers)
 
+        # 更新 step.http.headers 以传递修改后的 headers
+        step.http.headers = headers
+
         # 执行 HTTP 请求
         response = await self.http_client.request(step.http, rendered_body)
 
