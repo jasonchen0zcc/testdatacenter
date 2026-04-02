@@ -17,17 +17,28 @@ class TagStore:
         self,
         ctx: Context,
         tag_mapping: TagMappingConfig,
+        database: str = None,
         table_name: str = "tdc_data_tag"
     ):
         """保存标记数据"""
         from jinja2 import Environment, BaseLoader
+        from tdc.core.models import ExecutionContext
         env = Environment(loader=BaseLoader())
 
+        # 获取 execution（如果存在）
+        execution = ctx.get("_execution")
+
         # 渲染tag_mapping中的模板
+        # 将 Context 对象转换为字典，使 template 能直接访问 context.orderNo
+        context_dict = ctx.to_dict()
+
         def render_value(value):
             if isinstance(value, str) and value.startswith("{{"):
                 template = env.from_string(value)
-                return template.render(context=ctx, now=datetime.now())
+                render_ctx = {"context": context_dict, "now": datetime.now()}
+                if execution:
+                    render_ctx["execution"] = execution
+                return template.render(**render_ctx)
             return value
 
         user_id = render_value(tag_mapping.user_id)
@@ -40,8 +51,10 @@ class TagStore:
                 k: render_value(v) for k, v in tag_mapping.ext_info.items()
             })
 
+        # 使用完整表名（包含数据库名）
+        full_table_name = f"{database}.{table_name}" if database else table_name
         sql = text(f"""
-            INSERT INTO {table_name} (user_id, order_id, data_tag, task_id, ext_info, created_at)
+            INSERT INTO {full_table_name} (user_id, order_id, data_tag, task_id, ext_info, created_at)
             VALUES (:user_id, :order_id, :data_tag, :task_id, :ext_info, :created_at)
         """)
 

@@ -26,6 +26,7 @@ class MySQLPoolManager:
     def register_from_config(self, config: DBConfig):
         """从配置批量注册"""
         for instance_id, instance_config in config.instances.items():
+            # DSN 暂不指定数据库，由使用时通过 USE database 或完整表名指定
             dsn = f"mysql+aiomysql://{instance_config.user}:{instance_config.password}@{instance_config.host}:{instance_config.port}"
             self.register(instance_id, dsn, instance_config.pool_size)
 

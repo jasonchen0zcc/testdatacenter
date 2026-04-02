@@ -1,0 +1,4 @@
+{
+  "userId": "{{ execution.user.userId }}",
+  "mobile": "{{ execution.user.mobile }}"
+}

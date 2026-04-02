@@ -1,0 +1,81 @@
+task_id: "order_payment_flow"
+task_name: "订单支付全流程"
+task_type: "http_source"
+schedule: "0 */4 * * *"
+enabled: true
+target_db:
+  instance: "tdc"
+  database: "tdc"
+
+# 批量执行配置
+# 从 /user-info 获取用户列表，每个用户执行一次完整流程
+execution:
+  iterations: 5
+  user_source: "http"
+  user_http:
+    url: "http://8.137.20.173:8001/user-info"
+    method: "POST"
+    body: '{"page": 1, "size": 10}'
+    user_path: "data"
+    single_user: true
+    headers:
+      Content-Type: "application/json"
+    user_path: "data"        # JSONPath: 用户列表在 data 字段
+    user_field: "userId"     # 用户标识字段（实际会用整个用户对象）
+  delay_ms: 1000             # 每次迭代间隔1秒
+
+# 网关认证：兑换token
+# 每个用户使用自己的 userId 和 mobile 兑换token
+gateway:
+  auth_url: "http://8.137.20.173:8001/exchange-token"
+  method: "POST"
+  body_template: "exchange_token.json"
+  token_path: "data.token"   # JSONPath: token在响应中的路径
+  header_name: "Authorization"
+  header_prefix: "Bearer "
+  headers:
+    Content-Type: "application/json"
+
+# 数据标记映射（用于测试数据追溯）
+tag_mapping:
+  user_id: "{{ execution.user.userId }}"
+  order_id: "{{ context.orderNo | default('N/A') }}"
+  data_tag: "ORDER_PAYMENT_TEST"
+  ext_info:
+    mobile: "{{ execution.user.mobile }}"
+    flow_name: "order_payment_flow"
+
+# 业务流程管道
+pipeline:
+  # 步骤1: 创建订单
+  - step_id: "create_order"
+    name: "创建订单"
+    http:
+      url: "http://8.137.20.173:8001/create-order"
+      method: "POST"
+      body_template: "create_order.json"
+      headers:
+        Content-Type: "application/json"
+    extract:
+      orderNo: "data.orderNo"    # 提取订单号，供下一步使用
+
+  # 步骤2: 创建支付信息（依赖订单号）
+  - step_id: "create_pay_info"
+    name: "创建支付信息"
+    condition: "{{ context.orderNo }}"   # 只有成功获取订单号才执行
+    http:
+      url: "http://8.137.20.173:8001/create-pay-info"
+      method: "POST"
+      body_template: "create_pay_info.json"
+      headers:
+        Content-Type: "application/json"
+    extract:
+      payUrl: "data.payUrl"      # 提取支付链接
+
+# 失败处理配置
+on_failure:
+  action: "continue"           # 失败继续执行下一个迭代
+  retry:
+    max_attempts: 2
+    delay: 3
+    backoff: "fixed"

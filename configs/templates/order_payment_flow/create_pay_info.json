@@ -1,0 +1,6 @@
+{
+  "orderNo": "{{ context.orderNo }}",
+  "payChannel": "{{ faker.random_element(['WECHAT', 'ALIPAY', 'UNIONPAY']) }}",
+  "payType": "{{ faker.random_element(['QR_CODE', 'H5', 'APP']) }}",
+  "notifyUrl": "https://example.com/notify"
+}

@@ -40,6 +40,9 @@ class PipelineEngine:
                 total=execution_config.iterations
             )
 
+            # 将 execution 存入 context 供后续使用（如 tag_mapping）
+            ctx.set("_execution", execution)
+
             # 网关认证（如果配置）
             gateway_auth = None
             if config.gateway and self.template_loader:

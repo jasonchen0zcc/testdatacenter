@@ -45,7 +45,7 @@ class TaskRouter:
                 async with session_maker() as session:
                     async with session.begin():
                         inserter = BatchInserter(session)
-                        await inserter.tag_store.save_tags(ctx, config.tag_mapping)
+                        await inserter.tag_store.save_tags(ctx, config.tag_mapping, config.target_db.database)
 
             return result
         finally:

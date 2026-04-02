@@ -95,8 +95,10 @@ class UserHttpConfig(BaseModel):
     url: str
     method: str = "GET"
     headers: Dict[str, str] = Field(default_factory=dict)
-    user_path: str = "data"  # JSONPath 提取用户列表
+    body: Optional[str] = None  # JSON 请求体（POST 时使用）
+    user_path: str = "data"  # JSONPath 提取用户列表或单个用户
     user_field: Optional[str] = None  # 从用户对象中提取字段
+    single_user: bool = False  # 返回的是单个用户而非列表
 
 
 class ExecutionConfig(BaseModel):
