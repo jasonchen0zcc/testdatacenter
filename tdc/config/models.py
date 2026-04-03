@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -20,6 +21,11 @@ class HTTPConfig(BaseModel):
     auth: HTTPAuthConfig = Field(default_factory=HTTPAuthConfig)
 
 
+class DBAssertionMode(str, Enum):
+    SQL = "sql"
+    TABLE = "table"
+
+
 class AssertionConfig(BaseModel):
     """粗粒度断言配置"""
 
@@ -31,15 +37,6 @@ class AssertionConfig(BaseModel):
     # JSON 布尔成功标识断言
     json_success_path: Optional[str] = None  # 布尔字段路径，如 "success"
     json_success_value: bool = True  # 预期值，默认为 true
-
-
-class PipelineStepConfig(BaseModel):
-    step_id: str
-    name: Optional[str] = None
-    condition: Optional[str] = None
-    http: HTTPConfig
-    extract: Dict[str, str] = Field(default_factory=dict)
-    assertions: Optional[AssertionConfig] = None  # 粗粒度断言配置
 
 
 class FieldGeneratorConfig(BaseModel):
@@ -86,6 +83,41 @@ class RetryConfig(BaseModel):
     max_attempts: int = 3
     delay: int = 5
     backoff: str = "fixed"
+
+
+class DBAssertionConfig(BaseModel):
+    """数据库断言配置"""
+
+    instance: str
+    database: Optional[str] = None
+    mode: DBAssertionMode = DBAssertionMode.SQL
+
+    # mode=sql
+    sql: Optional[str] = None
+
+    # mode=table
+    table: Optional[str] = None
+    where: Optional[str] = None
+
+    # 断言规则
+    expected_rows: Optional[int] = None
+    expected_value: Optional[Any] = None
+    query_path: Optional[str] = None
+
+    delay_ms: int = 0
+    retry: RetryConfig = Field(default_factory=RetryConfig)
+    fail_on_error: bool = True
+    timeout: int = 5
+
+
+class PipelineStepConfig(BaseModel):
+    step_id: str
+    name: Optional[str] = None
+    condition: Optional[str] = None
+    http: HTTPConfig
+    extract: Dict[str, str] = Field(default_factory=dict)
+    assertions: Optional[AssertionConfig] = None
+    db_assertions: Optional[List[DBAssertionConfig]] = None
 
 
 class OnFailureConfig(BaseModel):

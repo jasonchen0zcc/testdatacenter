@@ -47,3 +47,25 @@ class TestTaskConfig:
         config = TaskConfig(**data)
         assert config.task_id == "test_insert"
         assert config.task_type.value == "direct_insert"
+
+    def test_pipeline_step_with_db_assertions(self):
+        from tdc.config.models import DBAssertionConfig, DBAssertionMode, PipelineStepConfig, HTTPConfig
+
+        step = PipelineStepConfig(
+            step_id="check_db",
+            http=HTTPConfig(url="http://example.com"),
+            db_assertions=[
+                DBAssertionConfig(
+                    instance="user_db",
+                    database="order_db",
+                    mode=DBAssertionMode.TABLE,
+                    table="orders",
+                    where='order_no = "123"',
+                    expected_rows=1,
+                    delay_ms=100,
+                )
+            ],
+        )
+        assert step.db_assertions is not None
+        assert len(step.db_assertions) == 1
+        assert step.db_assertions[0].instance == "user_db"
