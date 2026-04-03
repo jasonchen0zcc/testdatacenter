@@ -1,6 +1,3 @@
-import pytest
-from unittest.mock import Mock
-
 from tdc.core.models import Context, ExecutionContext
 from tdc.pipeline.context import ContextManager
 
@@ -24,8 +21,7 @@ class TestContextManager:
 
         execution = ExecutionContext(iteration=0, user="alice", total=10)
         result = manager.render_template_with_execution(
-            "User: {{ execution.user }}, Iter: {{ execution.iteration }}",
-            execution
+            "User: {{ execution.user }}, Iter: {{ execution.iteration }}", execution
         )
 
         assert result == "User: alice, Iter: 0"
@@ -37,8 +33,7 @@ class TestContextManager:
 
         execution = ExecutionContext(iteration=5, user="bob", total=100)
         result = manager.render_template_with_execution(
-            "{{ execution.iteration + 1 }}/{{ execution.total }}",
-            execution
+            "{{ execution.iteration + 1 }}/{{ execution.total }}", execution
         )
 
         assert result == "6/100"
@@ -51,9 +46,7 @@ class TestContextManager:
 
         data = {
             "msg": 'Hello {{ context.get("name") }}',
-            "nested": {
-                "greeting": "Hi {{ faker.name }}"
-            }
+            "nested": {"greeting": "Hi {{ faker.name }}"},
         }
         result = manager.render_dict(data)
 

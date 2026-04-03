@@ -8,7 +8,7 @@ from tdc.config.models import (
     PipelineStepConfig,
     TaskConfig,
     TargetDBConfig,
-    UserHttpConfig
+    UserHttpConfig,
 )
 from tdc.config.template_loader import TemplateLoader
 from tdc.core.constants import TaskType
@@ -46,12 +46,12 @@ class TestGatewayAuthIntegration:
                 iterations=2,
                 user_source="list",
                 user_list=["alice", "bob"],
-                delay_ms=50
+                delay_ms=50,
             ),
             gateway=GatewayConfig(
                 auth_url="https://auth.example.com/token",
                 body_template="auth.json",
-                token_path="access_token"
+                token_path="access_token",
             ),
             pipeline=[
                 PipelineStepConfig(
@@ -59,11 +59,11 @@ class TestGatewayAuthIntegration:
                     http=HTTPConfig(
                         url="https://api.example.com/orders",
                         method="POST",
-                        body_template="create_order.json"
-                    )
+                        body_template="create_order.json",
+                    ),
                 )
             ],
-            target_db=TargetDBConfig(instance="test", database="test_db")
+            target_db=TargetDBConfig(instance="test", database="test_db"),
         )
 
         # 创建 TemplateLoader（指向 templates 的父目录，即 tmp_path）
@@ -73,7 +73,9 @@ class TestGatewayAuthIntegration:
         engine = PipelineEngine(template_loader)
 
         with patch("tdc.pipeline.gateway_auth.httpx.AsyncClient") as mock_client_class:
-            with patch.object(engine.http_client, 'request', new_callable=AsyncMock) as mock_http_request:
+            with patch.object(
+                engine.http_client, "request", new_callable=AsyncMock
+            ) as mock_http_request:
                 # 模拟认证响应
                 mock_auth_response = Mock()
                 mock_auth_response.json.return_value = {"access_token": "token_123"}
@@ -104,7 +106,7 @@ class TestGatewayAuthIntegration:
                 # 验证请求头包含 token（HTTPConfig 的 headers 属性）
                 for call in mock_http_request.call_args_list:
                     config = call.args[0]  # 第一个参数是 HTTPConfig
-                    assert config.headers.get('Authorization') == 'Bearer token_123'
+                    assert config.headers.get("Authorization") == "Bearer token_123"
 
 
 class TestHttpUserSourceIntegration:
@@ -130,8 +132,8 @@ class TestHttpUserSourceIntegration:
                 user_http=UserHttpConfig(
                     url="https://api.example.com/users",
                     user_path="data.users",
-                    user_field="username"
-                )
+                    user_field="username",
+                ),
             ),
             pipeline=[
                 PipelineStepConfig(
@@ -139,25 +141,27 @@ class TestHttpUserSourceIntegration:
                     http=HTTPConfig(
                         url="https://api.example.com/action",
                         method="POST",
-                        body_template="step.json"
-                    )
+                        body_template="step.json",
+                    ),
                 )
             ],
-            target_db=TargetDBConfig(instance="test", database="test_db")
+            target_db=TargetDBConfig(instance="test", database="test_db"),
         )
 
         template_loader = TemplateLoader(str(tmp_path))
         engine = PipelineEngine(template_loader)
 
         with patch("tdc.pipeline.user_provider.httpx.request") as mock_user_request:
-            with patch.object(engine.http_client, 'request', new_callable=AsyncMock) as mock_http_request:
+            with patch.object(
+                engine.http_client, "request", new_callable=AsyncMock
+            ) as mock_http_request:
                 # 模拟用户列表响应
                 mock_user_response = Mock()
                 mock_user_response.json.return_value = {
                     "data": {
                         "users": [
                             {"id": 1, "username": "user_a"},
-                            {"id": 2, "username": "user_b"}
+                            {"id": 2, "username": "user_b"},
                         ]
                     }
                 }
@@ -178,6 +182,7 @@ class TestHttpUserSourceIntegration:
                 assert mock_user_request.call_count == 1
                 # 业务请求 3 次（iterations）
                 assert mock_http_request.call_count == 3
+
 
 class TestMultiStepGatewayAuthIntegration:
     """多步网关认证集成测试"""
@@ -204,10 +209,7 @@ class TestMultiStepGatewayAuthIntegration:
             task_type=TaskType.HTTP_SOURCE,
             schedule="0 * * * *",
             execution=ExecutionConfig(
-                iterations=1,
-                user_source="list",
-                user_list=["alice"],
-                delay_ms=50
+                iterations=1, user_source="list", user_list=["alice"], delay_ms=50
             ),
             gateway=GatewayConfig(
                 steps=[
@@ -216,17 +218,17 @@ class TestMultiStepGatewayAuthIntegration:
                         "auth_url": "https://auth.example.com/once-token",
                         "body_template": "once_token.json",
                         "token_path": "data.onceToken",
-                        "extract_to": "onceToken"
+                        "extract_to": "onceToken",
                     },
                     {
                         "name": "exchange_token",
                         "auth_url": "https://auth.example.com/exchange-token",
                         "body_template": "exchange_token.json",
-                        "token_path": "data.token"
-                    }
+                        "token_path": "data.token",
+                    },
                 ],
                 header_name="Authorization",
-                header_prefix="Bearer "
+                header_prefix="Bearer ",
             ),
             pipeline=[
                 PipelineStepConfig(
@@ -234,18 +236,20 @@ class TestMultiStepGatewayAuthIntegration:
                     http=HTTPConfig(
                         url="https://api.example.com/orders",
                         method="POST",
-                        body_template="create_order.json"
-                    )
+                        body_template="create_order.json",
+                    ),
                 )
             ],
-            target_db=TargetDBConfig(instance="test", database="test_db")
+            target_db=TargetDBConfig(instance="test", database="test_db"),
         )
 
         template_loader = TemplateLoader(str(tmp_path))
         engine = PipelineEngine(template_loader)
 
         with patch("tdc.pipeline.gateway_auth.httpx.AsyncClient") as mock_client_class:
-            with patch.object(engine.http_client, 'request', new_callable=AsyncMock) as mock_http_request:
+            with patch.object(
+                engine.http_client, "request", new_callable=AsyncMock
+            ) as mock_http_request:
                 # 模拟 once-token 响应
                 once_response = Mock()
                 once_response.json.return_value = {"data": {"onceToken": "once_abc"}}
@@ -257,7 +261,9 @@ class TestMultiStepGatewayAuthIntegration:
                 exchange_response.raise_for_status = Mock()
 
                 mock_client = Mock()
-                mock_client.request = AsyncMock(side_effect=[once_response, exchange_response])
+                mock_client.request = AsyncMock(
+                    side_effect=[once_response, exchange_response]
+                )
                 mock_client.__aenter__ = AsyncMock(return_value=mock_client)
                 mock_client.__aexit__ = AsyncMock(return_value=None)
                 mock_client_class.return_value = mock_client

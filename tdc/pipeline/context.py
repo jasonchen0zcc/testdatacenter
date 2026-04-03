@@ -1,6 +1,5 @@
-import random
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from jinja2 import Environment, BaseLoader
 from faker import Faker
 

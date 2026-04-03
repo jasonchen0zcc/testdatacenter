@@ -18,7 +18,7 @@ class GatewayAuth:
         config: GatewayConfig,
         task_id: str,
         template_loader: TemplateLoader,
-        context_manager: ContextManager
+        context_manager: ContextManager,
     ):
         self.config = config
         self.task_id = task_id
@@ -60,19 +60,20 @@ class GatewayAuth:
     def apply_to_request(self, headers: Dict[str, str]) -> Dict[str, str]:
         """将 token 注入请求 headers"""
         if self.token:
-            headers[self.config.header_name] = f"{self.config.header_prefix}{self.token}"
+            headers[self.config.header_name] = (
+                f"{self.config.header_prefix}{self.token}"
+            )
         return headers
 
     def _render_auth_body(
         self,
         step: "GatewayStepConfig",
         execution: ExecutionContext,
-        auth_context: Dict[str, str]
+        auth_context: Dict[str, str],
     ) -> str:
         """渲染认证请求体"""
         template = self.template_loader.load_body_template(
-            step.body_template,
-            self.task_id
+            step.body_template, self.task_id
         )
         return self.context_manager.render_template_with_execution_and_context(
             template, execution, auth_context
@@ -87,14 +88,14 @@ class GatewayAuth:
                     url=step.auth_url,
                     headers=step.headers,
                     content=body,
-                    timeout=30
+                    timeout=30,
                 )
                 response.raise_for_status()
                 return response.json()
         except httpx.HTTPStatusError as e:
             raise GatewayAuthError(
                 f"Gateway authentication failed: {e.response.status_code}",
-                status_code=e.response.status_code
+                status_code=e.response.status_code,
             )
         except httpx.RequestError as e:
             raise GatewayAuthError(f"Gateway authentication request failed: {e}")

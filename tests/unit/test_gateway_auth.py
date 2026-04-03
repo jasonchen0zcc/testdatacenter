@@ -21,13 +21,11 @@ class TestGatewayAuth:
                 body_template="auth.json",
                 token_path=token_path,
                 header_name="Authorization",
-                header_prefix="Bearer "
+                header_prefix="Bearer ",
             )
         else:
             config = GatewayConfig(
-                steps=steps,
-                header_name="Authorization",
-                header_prefix="Bearer "
+                steps=steps, header_name="Authorization", header_prefix="Bearer "
             )
         template_loader = Mock(spec=TemplateLoader)
         context = Mock()
@@ -41,9 +39,7 @@ class TestGatewayAuth:
     async def test_authenticate_success(self, mock_client_class):
         """测试认证成功获取 token"""
         mock_response = Mock()
-        mock_response.json.return_value = {
-            "data": {"access_token": "test_token_123"}
-        }
+        mock_response.json.return_value = {"data": {"access_token": "test_token_123"}}
         mock_response.raise_for_status = Mock()
 
         mock_client = Mock()
@@ -53,7 +49,9 @@ class TestGatewayAuth:
         mock_client_class.return_value = mock_client
 
         auth, template_loader, _ = self.create_gateway_auth()
-        template_loader.load_body_template.return_value = '{"username": "{{ execution.user }}"}'
+        template_loader.load_body_template.return_value = (
+            '{"username": "{{ execution.user }}"}'
+        )
 
         execution = ExecutionContext(iteration=0, user="testuser", total=1)
         token = await auth.authenticate(execution)
@@ -66,9 +64,7 @@ class TestGatewayAuth:
     async def test_authenticate_custom_token_path(self, mock_client_class):
         """测试自定义 token 路径"""
         mock_response = Mock()
-        mock_response.json.return_value = {
-            "result": {"token": "custom_token"}
-        }
+        mock_response.json.return_value = {"result": {"token": "custom_token"}}
         mock_response.raise_for_status = Mock()
 
         mock_client = Mock()
@@ -78,7 +74,7 @@ class TestGatewayAuth:
         mock_client_class.return_value = mock_client
 
         auth, template_loader, _ = self.create_gateway_auth(token_path="result.token")
-        template_loader.load_body_template.return_value = '{}'
+        template_loader.load_body_template.return_value = "{}"
 
         execution = ExecutionContext(iteration=0, user="testuser", total=1)
         token = await auth.authenticate(execution)
@@ -95,21 +91,23 @@ class TestGatewayAuth:
         mock_response.status_code = 401
 
         mock_client = Mock()
-        mock_client.request = AsyncMock(side_effect=httpx.HTTPStatusError(
-            "Unauthorized",
-            request=Mock(),
-            response=mock_response
-        ))
+        mock_client.request = AsyncMock(
+            side_effect=httpx.HTTPStatusError(
+                "Unauthorized", request=Mock(), response=mock_response
+            )
+        )
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
         mock_client_class.return_value = mock_client
 
         auth, template_loader, _ = self.create_gateway_auth()
-        template_loader.load_body_template.return_value = '{}'
+        template_loader.load_body_template.return_value = "{}"
 
         execution = ExecutionContext(iteration=0, user="testuser", total=1)
 
-        with pytest.raises(GatewayAuthError, match="Gateway authentication failed: 401"):
+        with pytest.raises(
+            GatewayAuthError, match="Gateway authentication failed: 401"
+        ):
             await auth.authenticate(execution)
 
     @pytest.mark.asyncio
@@ -127,7 +125,7 @@ class TestGatewayAuth:
         mock_client_class.return_value = mock_client
 
         auth, template_loader, _ = self.create_gateway_auth()
-        template_loader.load_body_template.return_value = '{}'
+        template_loader.load_body_template.return_value = "{}"
 
         execution = ExecutionContext(iteration=0, user="testuser", total=1)
 
@@ -179,18 +177,18 @@ class TestGatewayAuth:
                 auth_url="https://gateway.example.com/once-token",
                 body_template="once.json",
                 token_path="data.onceToken",
-                extract_to="onceToken"
+                extract_to="onceToken",
             ),
             GatewayStepConfig(
                 auth_url="https://gateway.example.com/exchange-token",
                 body_template="exchange.json",
-                token_path="data.token"
+                token_path="data.token",
             ),
         ]
         auth, template_loader, _ = self.create_gateway_auth(steps=steps)
         template_loader.load_body_template.side_effect = lambda t, task_id: {
             "once.json": '{"user":"{{ execution.user }}"}',
-            "exchange.json": '{"user":"{{ execution.user }}","onceToken":"{{ auth_context.onceToken }}"}'
+            "exchange.json": '{"user":"{{ execution.user }}","onceToken":"{{ auth_context.onceToken }}"}',
         }.get(t, t)
 
         execution = ExecutionContext(iteration=0, user="testuser", total=1)
@@ -210,7 +208,9 @@ class TestGatewayAuth:
         """测试所有步骤都有 extract_to 时抛出错误"""
         mock_client = Mock()
         mock_client.request = AsyncMock(
-            return_value=Mock(json=lambda: {"data": {"token": "t"}}, raise_for_status=Mock())
+            return_value=Mock(
+                json=lambda: {"data": {"token": "t"}}, raise_for_status=Mock()
+            )
         )
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
@@ -221,7 +221,7 @@ class TestGatewayAuth:
                 auth_url="https://gateway.example.com/step1",
                 body_template="s1.json",
                 token_path="data.token",
-                extract_to="temp"
+                extract_to="temp",
             ),
         ]
         auth, template_loader, _ = self.create_gateway_auth(steps=steps)

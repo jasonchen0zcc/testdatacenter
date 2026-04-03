@@ -1,8 +1,4 @@
-import pytest
-from tdc.config.models import (
-    TaskConfig, HTTPConfig, PipelineStepConfig, FieldGeneratorConfig
-)
-from tdc.core.constants import TaskType
+from tdc.config.models import TaskConfig
 
 
 class TestTaskConfig:
@@ -15,21 +11,15 @@ class TestTaskConfig:
             "pipeline": [
                 {
                     "step_id": "step1",
-                    "http": {
-                        "url": "https://api.example.com/test",
-                        "method": "GET"
-                    }
+                    "http": {"url": "https://api.example.com/test", "method": "GET"},
                 }
             ],
             "tag_mapping": {
                 "user_id": "$.data.id",
                 "order_id": "N/A",
-                "data_tag": "TEST"
+                "data_tag": "TEST",
             },
-            "target_db": {
-                "instance": "test_db",
-                "database": "test"
-            }
+            "target_db": {"instance": "test_db", "database": "test"},
         }
         config = TaskConfig(**data)
         assert config.task_id == "test_http"
@@ -45,19 +35,14 @@ class TestTaskConfig:
                 "table": "users",
                 "batch_size": 100,
                 "total_count": 1000,
-                "fields": {
-                    "id": {"type": "faker", "generator": "uuid4"}
-                }
+                "fields": {"id": {"type": "faker", "generator": "uuid4"}},
             },
             "tag_mapping": {
                 "user_id": "{{ faker.uuid4 }}",
                 "order_id": "N/A",
-                "data_tag": "TEST"
+                "data_tag": "TEST",
             },
-            "target_db": {
-                "instance": "test_db",
-                "database": "test"
-            }
+            "target_db": {"instance": "test_db", "database": "test"},
         }
         config = TaskConfig(**data)
         assert config.task_id == "test_insert"
