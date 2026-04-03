@@ -49,3 +49,4 @@ logs/
 docs/superpowers/plans/
 docs/superpowers/specs/
 CLAUDE.md
+.worktrees/
