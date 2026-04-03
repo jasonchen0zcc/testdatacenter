@@ -48,5 +48,4 @@ logs/
 # Claude-generated docs (keep only README.md)
 docs/superpowers/plans/
 docs/superpowers/specs/
-CLAUDE.md
 .worktrees/
