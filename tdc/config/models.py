@@ -109,6 +109,14 @@ class DBAssertionConfig(BaseModel):
     fail_on_error: bool = True
     timeout: int = 5
 
+    @model_validator(mode="after")
+    def _validate_mode_fields(self):
+        if self.mode == DBAssertionMode.SQL and self.sql is None:
+            raise ValueError("sql is required when mode is 'sql'")
+        if self.mode == DBAssertionMode.TABLE and self.table is None:
+            raise ValueError("table is required when mode is 'table'")
+        return self
+
 
 class PipelineStepConfig(BaseModel):
     step_id: str
