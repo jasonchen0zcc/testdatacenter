@@ -122,26 +122,30 @@ class GatewayConfig(BaseModel):
     header_prefix: str = "Bearer "
     headers: Dict[str, str] = Field(default_factory=dict)
 
-    @field_validator("steps", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def _normalize_legacy_fields(cls, v, info):
+    def _normalize_legacy_fields(cls, data):
         """如果未提供 steps，但有 auth_url/body_template，则自动转为单步 steps"""
-        if v is not None:
-            return v
-        data = info.data
+        if not isinstance(data, dict):
+            return data
+        steps = data.get("steps")
+        if steps is not None:
+            return data
         auth_url = data.get("auth_url")
         body_template = data.get("body_template")
         if auth_url and body_template:
-            return [
-                GatewayStepConfig(
-                    auth_url=auth_url,
-                    method=data.get("method", "POST"),
-                    body_template=body_template,
-                    token_path=data.get("token_path", "data.access_token"),
-                    headers=data.get("headers", {}),
-                )
+            data["steps"] = [
+                {
+                    "auth_url": auth_url,
+                    "method": data.get("method", "POST"),
+                    "body_template": body_template,
+                    "token_path": data.get("token_path", "data.access_token"),
+                    "headers": data.get("headers", {}),
+                }
             ]
-        return v
+            for key in ("auth_url", "method", "body_template", "token_path", "headers"):
+                data.pop(key, None)
+        return data
 
     @field_validator("steps")
     @classmethod
