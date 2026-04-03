@@ -33,7 +33,11 @@ class TaskRouter:
 
     async def _execute_http_source(self, config: TaskConfig):
         """执行HTTP源任务"""
-        engine = PipelineEngine(self.template_loader)
+        engine = PipelineEngine(
+            self.template_loader,
+            pool_manager=self.pool_manager,
+            default_database=config.target_db.database,
+        )
         ctx = Context(task_id=config.task_id)
 
         session_maker = self.pool_manager.get_session_maker(config.target_db.instance)
