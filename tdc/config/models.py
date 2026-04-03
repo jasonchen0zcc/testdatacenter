@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Literal, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from tdc.core.constants import TaskType, AuthType
 
@@ -22,14 +22,15 @@ class HTTPConfig(BaseModel):
 
 class AssertionConfig(BaseModel):
     """粗粒度断言配置"""
+
     # HTTP 状态码断言（支持单个值或列表）
     status_code: Optional[Any] = None  # 200 或 [200, 201]
     # JSON 字段断言
-    json_path: Optional[str] = None           # 字段路径，如 "code"
-    json_expected: Optional[Any] = None       # 期望值，如 200
+    json_path: Optional[str] = None  # 字段路径，如 "code"
+    json_expected: Optional[Any] = None  # 期望值，如 200
     # JSON 布尔成功标识断言
-    json_success_path: Optional[str] = None   # 布尔字段路径，如 "success"
-    json_success_value: bool = True           # 预期值，默认为 true
+    json_success_path: Optional[str] = None  # 布尔字段路径，如 "success"
+    json_success_value: bool = True  # 预期值，默认为 true
 
 
 class PipelineStepConfig(BaseModel):
@@ -92,19 +93,83 @@ class OnFailureConfig(BaseModel):
     retry: RetryConfig = Field(default_factory=RetryConfig)
 
 
-class GatewayConfig(BaseModel):
-    """网关认证配置"""
+class GatewayStepConfig(BaseModel):
+    """网关认证单步配置"""
+
+    name: Optional[str] = None
     auth_url: str
     method: str = "POST"
     body_template: str
     token_path: str = "data.access_token"  # JSONPath
+    extract_to: Optional[str] = (
+        None  # 提取值存入 auth_context 的 key；为空时视为最终 token
+    )
+    headers: Dict[str, str] = Field(default_factory=dict)
+
+
+class GatewayConfig(BaseModel):
+    """网关认证配置"""
+
+    # 新方式：多步认证链
+    steps: Optional[List[GatewayStepConfig]] = None
+
+    # 旧方式字段（保持兼容，自动转为单步 steps）
+    auth_url: Optional[str] = None
+    method: str = "POST"
+    body_template: Optional[str] = None
+    token_path: str = "data.access_token"
     header_name: str = "Authorization"
     header_prefix: str = "Bearer "
     headers: Dict[str, str] = Field(default_factory=dict)
 
+    @field_validator("steps", mode="before")
+    @classmethod
+    def _normalize_legacy_fields(cls, v, info):
+        """如果未提供 steps，但有 auth_url/body_template，则自动转为单步 steps"""
+        if v is not None:
+            return v
+        data = info.data
+        auth_url = data.get("auth_url")
+        body_template = data.get("body_template")
+        if auth_url and body_template:
+            return [
+                GatewayStepConfig(
+                    auth_url=auth_url,
+                    method=data.get("method", "POST"),
+                    body_template=body_template,
+                    token_path=data.get("token_path", "data.access_token"),
+                    headers=data.get("headers", {}),
+                )
+            ]
+        return v
+
+    @field_validator("steps")
+    @classmethod
+    def _steps_must_not_be_empty(cls, v):
+        if v is not None and len(v) == 0:
+            raise ValueError("gateway.steps must not be empty if provided")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_gateway_not_empty(self):
+        if self.steps is None and not (self.auth_url and self.body_template):
+            raise ValueError(
+                "gateway configuration requires steps or auth_url/body_template"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_no_conflicting_fields(self):
+        if self.steps is not None and (self.auth_url or self.body_template):
+            raise ValueError(
+                "cannot provide both gateway steps and legacy auth_url/body_template"
+            )
+        return self
+
 
 class UserHttpConfig(BaseModel):
     """HTTP 用户来源配置"""
+
     url: str
     method: str = "GET"
     headers: Dict[str, str] = Field(default_factory=dict)
@@ -116,6 +181,7 @@ class UserHttpConfig(BaseModel):
 
 class ExecutionConfig(BaseModel):
     """批量执行配置"""
+
     iterations: int = 1
     user_source: Literal["faker", "http", "list"] = "faker"
     # faker 模式
