@@ -48,8 +48,14 @@ class PipelineEngine:
         tasks = []
         for i in range(execution_config.iterations):
             task = self._execute_iteration(
-                i, execution_config, user_provider, config,
-                ctx, context_manager, semaphore, stats
+                i,
+                execution_config,
+                user_provider,
+                config,
+                ctx,
+                context_manager,
+                semaphore,
+                stats,
             )
             tasks.append(task)
 
@@ -67,8 +73,12 @@ class PipelineEngine:
         return PipelineResult(
             context=ctx,
             success=success,
-            error=None if success else f"Completed {stats.completed}/{stats.total}, failed: {stats.failed}",
-            step_results=[stats.to_dict()]
+            error=(
+                None
+                if success
+                else f"Completed {stats.completed}/{stats.total}, failed: {stats.failed}"
+            ),
+            step_results=[stats.to_dict()],
         )
 
     async def _execute_iteration(
@@ -80,7 +90,7 @@ class PipelineEngine:
         ctx: Context,
         context_manager: ContextManager,
         semaphore: asyncio.Semaphore,
-        stats: ExecutionStats
+        stats: ExecutionStats,
     ):
         """执行单次迭代（带并发控制）"""
         async with semaphore:
@@ -90,9 +100,7 @@ class PipelineEngine:
 
                 # 创建执行上下文
                 execution = ExecutionContext(
-                    iteration=iteration,
-                    user=user,
-                    total=execution_config.iterations
+                    iteration=iteration, user=user, total=execution_config.iterations
                 )
 
                 # 将 execution 存入 context 供后续使用（如 tag_mapping）
@@ -106,7 +114,7 @@ class PipelineEngine:
                         config.gateway,
                         config.task_id,
                         self.template_loader,
-                        context_manager
+                        context_manager,
                     )
                     try:
                         await gateway_auth.authenticate(execution)
@@ -125,13 +133,20 @@ class PipelineEngine:
                 all_success = all(r.get("success", True) for r in iteration_results)
                 error_msg = None
                 if not all_success:
-                    failed_steps = [r for r in iteration_results if not r.get("success", True)]
-                    error_msg = f"steps failed: {[s.get('step_id') for s in failed_steps]}"
+                    failed_steps = [
+                        r for r in iteration_results if not r.get("success", True)
+                    ]
+                    error_msg = (
+                        f"steps failed: {[s.get('step_id') for s in failed_steps]}"
+                    )
 
                 stats.add_result(iteration, all_success, error_msg)
 
                 # 单次迭代延迟
-                if iteration < execution_config.iterations - 1 and execution_config.delay_ms > 0:
+                if (
+                    iteration < execution_config.iterations - 1
+                    and execution_config.delay_ms > 0
+                ):
                     await asyncio.sleep(execution_config.delay_ms / 1000)
 
             except Exception as e:
@@ -145,7 +160,7 @@ class PipelineEngine:
         ctx: Context,
         execution: ExecutionContext,
         gateway_auth: Optional[GatewayAuth],
-        task_id: str
+        task_id: str,
     ) -> list:
         """执行单次 pipeline，返回 step 结果列表"""
         step_results = []
@@ -153,16 +168,11 @@ class PipelineEngine:
         for step in pipeline:
             try:
                 await self.execute_step(step, ctx, task_id, execution, gateway_auth)
-                step_results.append({
-                    "step_id": step.step_id,
-                    "success": True
-                })
+                step_results.append({"step_id": step.step_id, "success": True})
             except Exception as e:
-                step_results.append({
-                    "step_id": step.step_id,
-                    "success": False,
-                    "error": str(e)
-                })
+                step_results.append(
+                    {"step_id": step.step_id, "success": False, "error": str(e)}
+                )
 
         return step_results
 
@@ -172,7 +182,7 @@ class PipelineEngine:
         ctx: Context,
         task_id: str,
         execution: Optional[ExecutionContext] = None,
-        gateway_auth: Optional[GatewayAuth] = None
+        gateway_auth: Optional[GatewayAuth] = None,
     ) -> dict:
         """执行单个步骤"""
         manager = ContextManager(ctx)
@@ -185,7 +195,11 @@ class PipelineEngine:
                 )
             else:
                 condition_result = manager.render_template(step.condition)
-            if not condition_result or condition_result.strip() in ("False", "None", ""):
+            if not condition_result or condition_result.strip() in (
+                "False",
+                "None",
+                "",
+            ):
                 return {"skipped": True}
 
         # 加载并渲染请求体
@@ -224,7 +238,9 @@ class PipelineEngine:
         if step.assertions:
             assertion_result = AssertionValidator.validate(response, step.assertions)
             if not assertion_result.success:
-                raise AssertionError(f"Step '{step.step_id}' assertion failed: {assertion_result.message}")
+                raise AssertionError(
+                    f"Step '{step.step_id}' assertion failed: {assertion_result.message}"
+                )
 
         # 提取字段到上下文
         if step.extract:
