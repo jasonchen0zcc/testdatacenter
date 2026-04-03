@@ -39,7 +39,7 @@ class TaskRouter:
         session_maker = self.pool_manager.get_session_maker(config.target_db.instance)
         async with session_maker() as session:
             async with session.begin():
-                inserter = BatchInserter(session, config.target_db.database)
+                inserter = BatchInserter(session, config.target_db.database, log_database="tdc")
 
                 # 检查是否有运行中的任务（分布式锁）
                 if await inserter.task_logger.is_task_running(config.task_id):
@@ -66,7 +66,7 @@ class TaskRouter:
                     # 保存标记（传入 task_log_id 建立关联）
                     if result.success and config.tag_mapping:
                         await inserter.tag_store.save_tags(
-                            ctx, config.tag_mapping, config.target_db.database, task_log_id=log_id
+                            ctx, config.tag_mapping, "tdc", task_log_id=log_id
                         )
 
                     # 记录任务完成
@@ -96,7 +96,7 @@ class TaskRouter:
         session_maker = self.pool_manager.get_session_maker(config.target_db.instance)
         async with session_maker() as session:
             async with session.begin():
-                inserter = BatchInserter(session, config.target_db.database)
+                inserter = BatchInserter(session, config.target_db.database, log_database="tdc")
                 ctx = Context(task_id=config.task_id)
 
                 # 记录任务开始

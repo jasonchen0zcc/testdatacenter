@@ -1,7 +1,7 @@
 {
   "userId": "{{ execution.user.userId }}",
   "mobile": "{{ execution.user.mobile }}",
-  "productName": "{{ faker.word }}商品",
+  "productName": "{{ faker.word() }}商品",
   "amount": {{ faker.random_int(100, 10000) }},
   "quantity": {{ faker.random_int(1, 5) }},
   "remark": "测试订单-{{ now.isoformat() }}"

@@ -1,0 +1,46 @@
+task_id: "user_base_info_init"
+task_name: "初始化用户基础信息"
+task_type: "direct_insert"
+schedule: "0 2 * * *"
+
+data_template:
+  table: "user_base_info"
+  batch_size: 500
+  total_count: 1000
+
+  fields:
+    user_id:
+      type: "function"
+      expr: "random.randint(100000000, 109999999)"
+
+    unique_id:
+      type: "function"
+      expr: "str(uuid.uuid4()).replace('-', '')"
+
+    mobile:
+      type: "function"
+      expr: "int(msisdn_cn())"
+
+    name:
+      type: "faker"
+      generator: "name"
+      locale: "zh_CN"
+
+    create_by:
+      type: "faker"
+      generator: "name"
+      locale: "zh_CN"
+
+    update_by:
+      type: "faker"
+      generator: "name"
+      locale: "zh_CN"
+
+tag_mapping:
+  user_id: "{{ user_id }}"
+  order_id: "N/A"
+  data_tag: "USER_BASE_INFO"
+
+target_db:
+  instance: "user_db_master"
+  database: "user"

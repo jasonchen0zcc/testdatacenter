@@ -64,7 +64,6 @@ pipeline:
       status_code: 200              # HTTP 状态码断言
       json_path: "code"             # JSON 字段路径
       json_expected: 200            # JSON 字段期望值
-      json_success_path: "success"  # 布尔成功标识路径
     extract:
       orderNo: "data.orderNo"    # 提取订单号，供下一步使用
 

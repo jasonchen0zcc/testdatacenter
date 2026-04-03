@@ -5,3 +5,9 @@ instances:
     user: "${TDC_DB_USER}"
     password: "${TDC_DB_PASSWORD}"
     pool_size: ${TDC_DB_POOL_SIZE:-10}
+  user_db_master:
+    host: "${TDC_DB_HOST}"
+    port: ${TDC_DB_PORT:-3306}
+    user: "${TDC_DB_USER}"
+    password: "${TDC_DB_PASSWORD}"
+    pool_size: ${TDC_DB_POOL_SIZE:-10}
