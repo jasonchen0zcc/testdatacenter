@@ -2,6 +2,8 @@ import pytest
 from unittest.mock import AsyncMock, Mock, patch
 
 from tdc.config.models import (
+    DBAssertionConfig,
+    DBAssertionMode,
     ExecutionConfig,
     GatewayConfig,
     HTTPConfig,
@@ -151,3 +153,112 @@ class TestPipelineEngineIterations:
                 assert mock_client.request.call_count == 2
                 # HTTP 请求 2 次
                 assert mock_http_request.call_count == 2
+
+
+class TestPipelineEngineDbAssertions:
+    @pytest.mark.asyncio
+    async def test_execute_step_with_db_assertion_success(self):
+        template_loader = Mock()
+        pool_manager = Mock()
+        engine = PipelineEngine(template_loader, pool_manager=pool_manager, default_database="test_db")
+
+        step = PipelineStepConfig(
+            step_id="check_db",
+            http=HTTPConfig(url="http://example.com"),
+            db_assertions=[
+                DBAssertionConfig(
+                    instance="test_db",
+                    mode=DBAssertionMode.SQL,
+                    sql="SELECT 1",
+                    expected_rows=1,
+                )
+            ]
+        )
+
+        ctx = Context("task_1")
+
+        with patch.object(engine.http_client, 'request', new_callable=AsyncMock) as mock_http:
+            mock_resp = Mock()
+            mock_resp.status_code = 200
+            mock_resp.json.return_value = {}
+            mock_http.return_value = mock_resp
+
+            with patch("tdc.pipeline.engine.DBAssertionValidator.validate", new_callable=AsyncMock) as mock_db_validate:
+                from tdc.core.assertions import AssertionResult
+                mock_db_validate.return_value = AssertionResult(success=True)
+
+                result = await engine.execute_step(step, ctx, "task_1")
+
+                assert result["status_code"] == 200
+                assert mock_db_validate.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_step_with_db_assertion_failure_raises(self):
+        template_loader = Mock()
+        pool_manager = Mock()
+        engine = PipelineEngine(template_loader, pool_manager=pool_manager, default_database="test_db")
+
+        step = PipelineStepConfig(
+            step_id="check_db",
+            http=HTTPConfig(url="http://example.com"),
+            db_assertions=[
+                DBAssertionConfig(
+                    instance="test_db",
+                    mode=DBAssertionMode.SQL,
+                    sql="SELECT 1",
+                    expected_rows=1,
+                    fail_on_error=True,
+                )
+            ]
+        )
+
+        ctx = Context("task_1")
+
+        with patch.object(engine.http_client, 'request', new_callable=AsyncMock) as mock_http:
+            mock_resp = Mock()
+            mock_resp.status_code = 200
+            mock_resp.json.return_value = {}
+            mock_http.return_value = mock_resp
+
+            with patch("tdc.pipeline.engine.DBAssertionValidator.validate", new_callable=AsyncMock) as mock_db_validate:
+                from tdc.core.assertions import AssertionResult
+                mock_db_validate.return_value = AssertionResult(success=False, message="row mismatch")
+
+                with pytest.raises(AssertionError, match="DB assertion failed"):
+                    await engine.execute_step(step, ctx, "task_1")
+
+    @pytest.mark.asyncio
+    async def test_execute_step_with_db_assertion_failure_continue(self):
+        template_loader = Mock()
+        pool_manager = Mock()
+        engine = PipelineEngine(template_loader, pool_manager=pool_manager, default_database="test_db")
+
+        step = PipelineStepConfig(
+            step_id="check_db",
+            http=HTTPConfig(url="http://example.com"),
+            db_assertions=[
+                DBAssertionConfig(
+                    instance="test_db",
+                    mode=DBAssertionMode.SQL,
+                    sql="SELECT 1",
+                    expected_rows=1,
+                    fail_on_error=False,
+                )
+            ]
+        )
+
+        ctx = Context("task_1")
+
+        with patch.object(engine.http_client, 'request', new_callable=AsyncMock) as mock_http:
+            mock_resp = Mock()
+            mock_resp.status_code = 200
+            mock_resp.json.return_value = {}
+            mock_http.return_value = mock_resp
+
+            with patch("tdc.pipeline.engine.DBAssertionValidator.validate", new_callable=AsyncMock) as mock_db_validate:
+                from tdc.core.assertions import AssertionResult
+                mock_db_validate.return_value = AssertionResult(success=False, message="row mismatch")
+
+                result = await engine.execute_step(step, ctx, "task_1")
+
+                assert result["status_code"] == 200

@@ -9,17 +9,26 @@ from tdc.core.assertions import AssertionValidator
 from tdc.core.execution_stats import ExecutionStats
 from tdc.core.models import Context, ExecutionContext, PipelineResult
 from tdc.pipeline.context import ContextManager
+from tdc.core.db_assertions import DBAssertionValidator
 from tdc.pipeline.gateway_auth import GatewayAuth
 from tdc.pipeline.http_client import HTTPClient
 from tdc.pipeline.user_provider import UserProvider
+from tdc.storage.mysql_pool import MySQLPoolManager
 
 
 class PipelineEngine:
     """管道执行引擎"""
 
-    def __init__(self, template_loader: Optional[TemplateLoader] = None):
+    def __init__(
+        self,
+        template_loader: Optional[TemplateLoader] = None,
+        pool_manager: Optional[MySQLPoolManager] = None,
+        default_database: Optional[str] = None,
+    ):
         self.http_client = HTTPClient()
         self.template_loader = template_loader
+        self.pool_manager = pool_manager
+        self.default_database = default_database
 
     async def execute(self, config: TaskConfig, ctx: Context) -> PipelineResult:
         """执行完整的管道（支持并发控制）"""
@@ -223,6 +232,21 @@ class PipelineEngine:
             for key, json_path in step.extract.items():
                 value = self._extract_by_jsonpath(response_data, json_path)
                 ctx.set(key, value)
+
+        # 执行 DB 断言
+        if step.db_assertions and self.pool_manager:
+            for db_assertion in step.db_assertions:
+                db_result = await DBAssertionValidator.validate(
+                    config=db_assertion,
+                    pool_manager=self.pool_manager,
+                    context_manager=manager,
+                    execution=execution,
+                    default_database=self.default_database,
+                )
+                if not db_result.success and db_assertion.fail_on_error:
+                    raise AssertionError(
+                        f"Step '{step.step_id}' DB assertion failed: {db_result.message}"
+                    )
 
         return {"status_code": response.status_code}
 
