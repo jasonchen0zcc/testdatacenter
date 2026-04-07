@@ -1,0 +1,40 @@
+# 公共步骤模板
+# 使用方式：在任务配置中通过 YAML anchor 引用
+
+step_templates:
+  # 用户登录步骤
+  login: &step_login
+    step_id: "login"
+    name: "用户登录"
+    http:
+      url: "{{ gateway }}/auth"
+      method: POST
+      body_template: "login.json"
+      headers:
+        Content-Type: "application/json"
+    extract:
+      token: "data.token"
+      user_id: "data.user.id"
+
+  # 创建用户步骤
+  create_user: &step_create_user
+    step_id: "create_user"
+    name: "创建用户"
+    http:
+      url: "{{ gateway }}/users"
+      method: POST
+      body_template: "create_user.json"
+      headers:
+        Content-Type: "application/json"
+    extract:
+      user_id: "data.id"
+
+  # 验证 token 步骤
+  verify_token: &step_verify_token
+    step_id: "verify_token"
+    name: "验证 Token"
+    http:
+      url: "{{ gateway }}/verify"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ context.token }}"
