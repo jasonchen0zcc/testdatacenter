@@ -1,14 +1,12 @@
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine
 
 from tdc.config.models import (
     DBOperationItem,
     DBOperationMode,
-    DBOperationTiming,
     DBOperationType,
     SingleDBOperationConfig,
     TransactionDBOperationConfig,
@@ -71,7 +69,7 @@ class DBOperationExecutor:
 
         # table 模式
         if config.type == DBOperationType.UPDATE:
-            set_clause = ", ".join([f"`{k}` = :{k}" for k in config.set.keys()])
+            set_clause = ", ".join([f"`{k}` = :{k}" for k in (config.set or {}).keys()])
             return f"UPDATE `{config.table}` SET {set_clause} WHERE {config.where}"
         else:  # DELETE
             return f"DELETE FROM `{config.table}` WHERE {config.where}"

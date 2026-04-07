@@ -185,7 +185,7 @@ class PipelineStepConfig(BaseModel):
     step_id: str
     name: Optional[str] = None
     condition: Optional[str] = None
-    http: HTTPConfig
+    http: Optional[HTTPConfig] = None
     extract: Dict[str, str] = Field(default_factory=dict)
     assertions: Optional[AssertionConfig] = None
     db_assertions: Optional[List[DBAssertionConfig]] = None
