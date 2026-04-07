@@ -104,3 +104,13 @@ class ConfigLoader:
             if task.task_id == task_id:
                 return task
         raise ConfigError(f"Task config not found: {task_id}")
+
+    def load_task_file(self, file_path: Path) -> TaskConfig:
+        """加载单个任务配置文件"""
+        if not file_path.exists():
+            raise ConfigError(f"Task file not found: {file_path}")
+
+        content = file_path.read_text()
+        content = expand_env_vars(content)
+        data = yaml.safe_load(content)
+        return TaskConfig(**data)
