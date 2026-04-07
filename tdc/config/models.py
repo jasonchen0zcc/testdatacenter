@@ -383,3 +383,11 @@ class DBInstanceConfig(BaseModel):
 
 class DBConfig(BaseModel):
     instances: Dict[str, DBInstanceConfig]
+
+
+class SecretRef(BaseModel):
+    """密钥引用配置模型"""
+    provider: str  # env, file, vault, aws_sm
+    key: Optional[str] = None  # 环境变量名或密钥名
+    path: Optional[str] = None  # 文件路径或密钥路径
+    default: Optional[str] = None  # 默认值
