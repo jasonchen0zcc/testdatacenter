@@ -155,7 +155,9 @@ class ConfigLoader:
                         mtime = task_file.stat().st_mtime
                         asyncio.run(self.cache.set(task_id, config, mtime, task_file))
                     return config
-            except ConfigError:
+            except ConfigError as e:
+                if "Circular inheritance" in str(e):
+                    raise
                 continue
 
         raise ConfigError(f"Task config not found: {task_id}")
