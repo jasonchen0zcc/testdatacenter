@@ -4,7 +4,22 @@ class TDCError(Exception):
 
 
 class ConfigError(TDCError):
-    """配置错误"""
+    """配置错误基类"""
+    pass
+
+
+class ConfigInheritanceError(ConfigError):
+    """配置继承错误"""
+    pass
+
+
+class ConfigCircularDependencyError(ConfigInheritanceError):
+    """配置循环依赖错误"""
+    pass
+
+
+class SecretResolutionError(ConfigError):
+    """密钥解析错误"""
     pass
 
 
