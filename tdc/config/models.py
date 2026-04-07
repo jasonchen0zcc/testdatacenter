@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from tdc.core.constants import TaskType, AuthType
@@ -118,6 +118,69 @@ class DBAssertionConfig(BaseModel):
         return self
 
 
+class DBOperationType(str, Enum):
+    UPDATE = "update"
+    DELETE = "delete"
+
+
+class DBOperationTiming(str, Enum):
+    BEFORE_ASSERTIONS = "before_assertions"
+    AFTER_ASSERTIONS = "after_assertions"
+    AFTER_EXTRACT = "after_extract"
+
+
+class DBOperationMode(str, Enum):
+    TABLE = "table"
+    SQL = "sql"
+
+
+class SingleDBOperationConfig(BaseModel):
+    """单条数据库操作配置"""
+    type: DBOperationType
+    instance: str
+    database: Optional[str] = None
+    mode: DBOperationMode = DBOperationMode.TABLE
+    timing: DBOperationTiming = DBOperationTiming.AFTER_ASSERTIONS
+    fail_on_error: bool = False
+
+    # table 模式
+    table: Optional[str] = None
+    set: Optional[Dict[str, Any]] = None
+    where: Optional[str] = None
+
+    # sql 模式
+    sql: Optional[str] = None
+    params: Optional[Dict[str, Any]] = None
+
+    # 批量参数
+    batch_params: Optional[Dict[str, str]] = None
+
+    # 结果回写
+    extract: Optional[Dict[str, str]] = None
+
+    @model_validator(mode="after")
+    def _validate_mode_fields(self):
+        if self.mode == DBOperationMode.TABLE:
+            if self.table is None:
+                raise ValueError("table is required when mode is 'table'")
+            if self.type == DBOperationType.UPDATE and not self.set:
+                raise ValueError("set is required for UPDATE operation")
+        else:
+            if self.sql is None:
+                raise ValueError("sql is required when mode is 'sql'")
+        return self
+
+
+class TransactionDBOperationConfig(BaseModel):
+    """事务包裹的数据库操作配置"""
+    transaction: Literal[True]
+    fail_on_error: bool = True
+    operations: List[SingleDBOperationConfig]
+
+
+DBOperationItem = Union[SingleDBOperationConfig, TransactionDBOperationConfig]
+
+
 class PipelineStepConfig(BaseModel):
     step_id: str
     name: Optional[str] = None
@@ -126,6 +189,7 @@ class PipelineStepConfig(BaseModel):
     extract: Dict[str, str] = Field(default_factory=dict)
     assertions: Optional[AssertionConfig] = None
     db_assertions: Optional[List[DBAssertionConfig]] = None
+    db_operations: Optional[List[DBOperationItem]] = None
 
 
 class OnFailureConfig(BaseModel):
