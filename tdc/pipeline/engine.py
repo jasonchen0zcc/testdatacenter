@@ -10,6 +10,8 @@ from tdc.core.execution_stats import ExecutionStats
 from tdc.core.models import Context, ExecutionContext, PipelineResult
 from tdc.pipeline.context import ContextManager
 from tdc.core.db_assertions import DBAssertionValidator
+from tdc.config.models import DBOperationTiming
+from tdc.storage.db_operations import DBOperationExecutor, DBOperationResult
 from tdc.pipeline.gateway_auth import GatewayAuth
 from tdc.pipeline.http_client import HTTPClient
 from tdc.pipeline.user_provider import UserProvider
@@ -29,6 +31,9 @@ class PipelineEngine:
         self.template_loader = template_loader
         self.pool_manager = pool_manager
         self.default_database = default_database
+        self.db_operation_executor = (
+            DBOperationExecutor(pool_manager) if pool_manager else None
+        )
 
     async def execute(self, config: TaskConfig, ctx: Context) -> PipelineResult:
         """执行完整的管道（支持并发控制）"""
@@ -202,9 +207,14 @@ class PipelineEngine:
             ):
                 return {"skipped": True}
 
+        # 1. 执行 before_assertions 的数据库操作
+        await self._execute_db_operations(
+            step, DBOperationTiming.BEFORE_ASSERTIONS, manager, execution
+        )
+
         # 加载并渲染请求体
         rendered_body = None
-        if step.http.body_template:
+        if step.http and step.http.body_template:
             # 使用 template_loader 加载模板内容
             if self.template_loader:
                 template_content = self.template_loader.load_body_template(
@@ -232,22 +242,34 @@ class PipelineEngine:
         step.http.headers = headers
 
         # 执行 HTTP 请求
-        response = await self.http_client.request(step.http, rendered_body)
+        response = None
+        if step.http:
+            response = await self.http_client.request(step.http, rendered_body)
 
-        # 【新增】执行粗粒度断言验证
-        if step.assertions:
-            assertion_result = AssertionValidator.validate(response, step.assertions)
-            if not assertion_result.success:
-                raise AssertionError(
-                    f"Step '{step.step_id}' assertion failed: {assertion_result.message}"
-                )
+            # 【新增】执行粗粒度断言验证
+            if step.assertions:
+                assertion_result = AssertionValidator.validate(response, step.assertions)
+                if not assertion_result.success:
+                    raise AssertionError(
+                        f"Step '{step.step_id}' assertion failed: {assertion_result.message}"
+                    )
+
+        # 2. 执行 after_assertions 的数据库操作（默认时机）
+        await self._execute_db_operations(
+            step, DBOperationTiming.AFTER_ASSERTIONS, manager, execution
+        )
 
         # 提取字段到上下文
-        if step.extract:
+        if step.extract and response:
             response_data = response.json()
             for key, json_path in step.extract.items():
                 value = self._extract_by_jsonpath(response_data, json_path)
                 ctx.set(key, value)
+
+        # 3. 执行 after_extract 的数据库操作
+        await self._execute_db_operations(
+            step, DBOperationTiming.AFTER_EXTRACT, manager, execution
+        )
 
         # 执行 DB 断言
         if step.db_assertions and self.pool_manager:
@@ -264,7 +286,7 @@ class PipelineEngine:
                         f"Step '{step.step_id}' DB assertion failed: {db_result.message}"
                     )
 
-        return {"status_code": response.status_code}
+        return {"status_code": response.status_code if response else 200}
 
     def _extract_by_jsonpath(self, data: dict, path: str):
         """使用JSONPath提取数据"""
@@ -273,6 +295,51 @@ class PipelineEngine:
         if matches:
             return matches[0].value
         return None
+
+    async def _execute_db_operations(
+        self,
+        step: PipelineStepConfig,
+        timing: DBOperationTiming,
+        manager: ContextManager,
+        execution: Optional[ExecutionContext],
+    ) -> Optional[DBOperationResult]:
+        """执行指定时机的数据库操作"""
+        if not self.db_operation_executor or not step.db_operations:
+            return None
+
+        # 过滤出当前时机的操作
+        from tdc.config.models import TransactionDBOperationConfig
+
+        ops = [
+            op
+            for op in step.db_operations
+            if isinstance(op, TransactionDBOperationConfig) or op.timing == timing
+        ]
+
+        if not ops:
+            return None
+
+        result = await self.db_operation_executor.execute(
+            ops, manager, execution, self.default_database
+        )
+
+        # 检查是否需要阻断
+        if not result.success:
+            failed_any = any(not r.success for r in result.results)
+            if failed_any:
+                # 检查是否有 fail_on_error
+                for i, op in enumerate(ops):
+                    if isinstance(op, TransactionDBOperationConfig):
+                        if op.fail_on_error and not result.results[i].success:
+                            raise AssertionError(
+                                f"Step '{step.step_id}' db_operations failed: {result.results[i].message}"
+                            )
+                    elif op.fail_on_error and not result.results[i].success:
+                        raise AssertionError(
+                            f"Step '{step.step_id}' db_operation failed: {result.results[i].message}"
+                        )
+
+        return result
 
     async def close(self):
         await self.http_client.close()

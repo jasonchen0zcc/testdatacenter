@@ -1,0 +1,21 @@
+# 任务目录索引
+
+# 自动发现所有子目录中的任务
+auto_discover: true
+
+# 任务分类
+categories:
+  example:
+    display_name: "示例任务"
+    owner: "platform-team"
+    tags: ["example", "demo"]
+    description: "用于演示系统功能的示例任务"
+
+# 环境配置
+environments:
+  dev:
+    base: "base/default"
+  test:
+    base: "base/default"
+  prod:
+    base: "base/prod"

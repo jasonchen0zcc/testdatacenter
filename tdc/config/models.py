@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from tdc.core.constants import TaskType, AuthType
@@ -10,6 +10,16 @@ class HTTPAuthConfig(BaseModel):
     token: Optional[str] = None
     secret_key: Optional[str] = None
     algorithm: str = "sha256"
+
+
+class SecretRef(BaseModel):
+    """密钥引用配置"""
+    provider: str  # env, vault, file, aws_sm
+    key: Optional[str] = None
+    path: Optional[str] = None
+    default: Optional[str] = None
+    secret_id: Optional[str] = None  # for aws_sm
+    encoding: str = "utf-8"  # for file provider
 
 
 class HTTPConfig(BaseModel):
@@ -118,14 +128,78 @@ class DBAssertionConfig(BaseModel):
         return self
 
 
+class DBOperationType(str, Enum):
+    UPDATE = "update"
+    DELETE = "delete"
+
+
+class DBOperationTiming(str, Enum):
+    BEFORE_ASSERTIONS = "before_assertions"
+    AFTER_ASSERTIONS = "after_assertions"
+    AFTER_EXTRACT = "after_extract"
+
+
+class DBOperationMode(str, Enum):
+    TABLE = "table"
+    SQL = "sql"
+
+
+class SingleDBOperationConfig(BaseModel):
+    """单条数据库操作配置"""
+    type: DBOperationType
+    instance: str
+    database: Optional[str] = None
+    mode: DBOperationMode = DBOperationMode.TABLE
+    timing: DBOperationTiming = DBOperationTiming.AFTER_ASSERTIONS
+    fail_on_error: bool = False
+
+    # table 模式
+    table: Optional[str] = None
+    set: Optional[Dict[str, Any]] = None
+    where: Optional[str] = None
+
+    # sql 模式
+    sql: Optional[str] = None
+    params: Optional[Dict[str, Any]] = None
+
+    # 批量参数
+    batch_params: Optional[Dict[str, str]] = None
+
+    # 结果回写
+    extract: Optional[Dict[str, str]] = None
+
+    @model_validator(mode="after")
+    def _validate_mode_fields(self):
+        if self.mode == DBOperationMode.TABLE:
+            if self.table is None:
+                raise ValueError("table is required when mode is 'table'")
+            if self.type == DBOperationType.UPDATE and not self.set:
+                raise ValueError("set is required for UPDATE operation")
+        else:
+            if self.sql is None:
+                raise ValueError("sql is required when mode is 'sql'")
+        return self
+
+
+class TransactionDBOperationConfig(BaseModel):
+    """事务包裹的数据库操作配置"""
+    transaction: Literal[True]
+    fail_on_error: bool = True
+    operations: List[SingleDBOperationConfig]
+
+
+DBOperationItem = Union[SingleDBOperationConfig, TransactionDBOperationConfig]
+
+
 class PipelineStepConfig(BaseModel):
     step_id: str
     name: Optional[str] = None
     condition: Optional[str] = None
-    http: HTTPConfig
+    http: Optional[HTTPConfig] = None
     extract: Dict[str, str] = Field(default_factory=dict)
     assertions: Optional[AssertionConfig] = None
     db_assertions: Optional[List[DBAssertionConfig]] = None
+    db_operations: Optional[List[DBOperationItem]] = None
 
 
 class OnFailureConfig(BaseModel):
@@ -258,6 +332,14 @@ class TaskConfig(BaseModel):
     # 新增：网关认证和批量执行配置
     gateway: Optional[GatewayConfig] = None
     execution: Optional[ExecutionConfig] = None
+    # 配置继承
+    extends: Optional[Union[str, List[str]]] = None
+    imports: Optional[Dict[str, str]] = None
+
+    # 元数据
+    category: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+    owner: Optional[str] = None
     # common
     target_db: TargetDBConfig
 
@@ -276,6 +358,19 @@ class TaskConfig(BaseModel):
         if values.get("task_type") == TaskType.DIRECT_INSERT and not v:
             raise ValueError("direct_insert tasks require data_template configuration")
         return v
+
+    @field_validator("extends")
+    @classmethod
+    def validate_extends(cls, v):
+        if v is None:
+            return v
+        if isinstance(v, str):
+            return v
+        if isinstance(v, list):
+            if len(v) == 0:
+                raise ValueError("extends list cannot be empty")
+            return v
+        raise ValueError("extends must be string or list of strings")
 
 
 class DBInstanceConfig(BaseModel):
