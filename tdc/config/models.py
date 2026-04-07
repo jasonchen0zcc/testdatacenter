@@ -12,6 +12,16 @@ class HTTPAuthConfig(BaseModel):
     algorithm: str = "sha256"
 
 
+class SecretRef(BaseModel):
+    """密钥引用配置"""
+    provider: str  # env, vault, file, aws_sm
+    key: Optional[str] = None
+    path: Optional[str] = None
+    default: Optional[str] = None
+    secret_id: Optional[str] = None  # for aws_sm
+    encoding: str = "utf-8"  # for file provider
+
+
 class HTTPConfig(BaseModel):
     url: str
     method: str = "GET"
@@ -322,6 +332,14 @@ class TaskConfig(BaseModel):
     # 新增：网关认证和批量执行配置
     gateway: Optional[GatewayConfig] = None
     execution: Optional[ExecutionConfig] = None
+    # 配置继承
+    extends: Optional[Union[str, List[str]]] = None
+    imports: Optional[Dict[str, str]] = None
+
+    # 元数据
+    category: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+    owner: Optional[str] = None
     # common
     target_db: TargetDBConfig
 
@@ -340,6 +358,19 @@ class TaskConfig(BaseModel):
         if values.get("task_type") == TaskType.DIRECT_INSERT and not v:
             raise ValueError("direct_insert tasks require data_template configuration")
         return v
+
+    @field_validator("extends")
+    @classmethod
+    def validate_extends(cls, v):
+        if v is None:
+            return v
+        if isinstance(v, str):
+            return v
+        if isinstance(v, list):
+            if len(v) == 0:
+                raise ValueError("extends list cannot be empty")
+            return v
+        raise ValueError("extends must be string or list of strings")
 
 
 class DBInstanceConfig(BaseModel):
