@@ -90,5 +90,5 @@ class TDScheduler:
 
     async def run_task_now(self, task_id: str):
         """立即执行指定任务"""
-        task = self.config_loader.load_task_by_id(task_id)
+        task = await self.config_loader.load_task_by_id(task_id)
         return await self.router.route(task)

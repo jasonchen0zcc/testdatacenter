@@ -1,7 +1,0 @@
-{
-  "username": "{{ faker.name }}",
-  "email": "{{ faker.email }}",
-  "phone": "{{ faker.phone_number }}",
-  "register_time": "{{ now.isoformat() }}",
-  "source": "TDC_AUTO_GENERATE"
-}

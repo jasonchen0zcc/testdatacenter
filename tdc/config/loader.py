@@ -134,11 +134,11 @@ class ConfigLoader:
 
         return TaskConfig(**data)
 
-    def load_task_by_id(self, task_id: str) -> TaskConfig:
+    async def load_task_by_id(self, task_id: str) -> TaskConfig:
         """根据 ID 加载任务配置"""
         # 先检查缓存
         if self.cache:
-            cached = asyncio.run(self.cache.get(task_id))
+            cached = await self.cache.get(task_id)
             if cached:
                 return cached
 
@@ -153,7 +153,7 @@ class ConfigLoader:
                     # 存入缓存
                     if self.cache:
                         mtime = task_file.stat().st_mtime
-                        asyncio.run(self.cache.set(task_id, config, mtime, task_file))
+                        await self.cache.set(task_id, config, mtime, task_file)
                     return config
             except ConfigError as e:
                 if "Circular inheritance" in str(e):

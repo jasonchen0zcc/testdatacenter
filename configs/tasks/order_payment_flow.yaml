@@ -1,0 +1,88 @@
+# 订单-支付流程任务
+# 1. 获取 Gateway Token（继承公共配置）
+# 2. 创建订单
+# 3. 获取支付信息
+
+extends: "base/default"
+
+task_id: "order_payment_flow"
+task_name: "订单支付流程"
+task_type: "http_source"
+description: "创建订单并获取支付信息"
+schedule: "0 */6 * * *"
+enabled: true
+timeout: 300
+
+# Gateway 认证配置
+gateway:
+  steps:
+    - name: "获取用户信息"
+      auth_url: "http://8.137.20.173:8001/user-info"
+      method: POST
+      body_template: "{}"
+      token_path: "data.userId"
+      extract_to: "user_id"
+    - name: "获取临时token"
+      auth_url: "http://8.137.20.173:8001/once-token"
+      method: POST
+      body_template: |
+        {"userId": "{{ context.user_id }}"}
+      token_path: "data.token"
+      extract_to: "temp_token"
+    - name: "兑换正式token"
+      auth_url: "http://8.137.20.173:8001/exchange-token"
+      method: POST
+      body_template: |
+        {"token": "{{ context.temp_token }}"}
+      token_path: "data.access_token"
+
+# 执行配置
+execution:
+  iterations: 1
+  concurrency: 1
+  delay_ms: 0
+  fail_fast: true
+  continue_on_error: false
+
+# HTTP 流程
+pipeline:
+  # 步骤1: 创建订单
+  - step_id: "create_order"
+    name: "创建订单"
+    http:
+      url: "http://8.137.20.173:8001/create-order"
+      method: POST
+      headers:
+        Content-Type: "application/json"
+      body_template: "create_order.json"
+    extract:
+      order_no: "data.orderNo"
+    assertions:
+      status_code: 200
+      json_path: "code"
+      json_expected: 200
+
+  # 步骤2: 获取支付信息
+  - step_id: "create_pay_info"
+    name: "获取支付信息"
+    http:
+      url: "http://8.137.20.173:8001/create-pay-info"
+      method: POST
+      headers:
+        Content-Type: "application/json"
+      body_template: "create_pay_info.json"
+    extract:
+      pay_serial_no: "data.paySerialNo"
+    assertions:
+      status_code: 200
+      json_path: "code"
+      json_expected: 200
+
+tag_mapping:
+  user_id: "{{ context.user_id | default('N/A') }}"
+  order_id: "{{ context.order_no }}"
+  data_tag: "ORDER_PAYMENT_FLOW"
+
+target_db:
+  instance: "tdc"
+  database: "tdc"

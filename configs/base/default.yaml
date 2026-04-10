@@ -1,26 +1,17 @@
-base_id: "default"
+# 默认基础配置
+# 被所有任务继承，可通过任务配置覆盖
+
+# 引入公共 Gateway 认证配置
+extends:
+  - "common/gateway_auth"
 
 # 默认执行配置
 execution:
   iterations: 1
-  user_source: "faker"
-  user_template: "{{ faker.username }}"
-  delay_ms: 0
   concurrency: 1
-  batch_delay_ms: 0
+  delay_ms: 0
   fail_fast: false
   continue_on_error: true
 
-# 默认失败处理
-on_failure:
-  action: "stop"
-  retry:
-    max_attempts: 3
-    delay: 5
-    backoff: "fixed"
-
-# 默认超时
+# 默认超时（秒）
 timeout: 300
-
-# 默认启用状态
-enabled: true

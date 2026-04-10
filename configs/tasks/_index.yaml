@@ -1,21 +1,15 @@
-# 任务目录索引
+# 任务索引文件
+# 用于集中管理所有任务配置
 
-# 自动发现所有子目录中的任务
-auto_discover: true
+tasks:
+  # 订单-支付流程
+  order_payment_flow:
+    file: "${CONFIG_DIR}/tasks/order_payment_flow.yaml"
+    description: "创建订单并获取支付信息"
+    enabled: true
 
-# 任务分类
-categories:
-  example:
-    display_name: "示例任务"
-    owner: "platform-team"
-    tags: ["example", "demo"]
-    description: "用于演示系统功能的示例任务"
-
-# 环境配置
-environments:
-  dev:
-    base: "base/default"
-  test:
-    base: "base/default"
-  prod:
-    base: "base/prod"
+  # 用户基础信息初始化
+  user_base_info_init:
+    file: "${CONFIG_DIR}/tasks/user_base_info_insert.yaml"
+    description: "向 user.user_base_info 批量插入测试数据，每次100条"
+    enabled: true

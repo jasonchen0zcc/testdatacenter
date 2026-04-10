@@ -1,0 +1,58 @@
+# 公共 Gateway 认证配置
+# 三步认证流程：
+# 1. 获取用户信息 (user-info)
+# 2. 获取临时 token (once-token)
+# 3. 兑换正式 token (exchange-token)
+
+gateway:
+  # 认证服务基础配置
+  base_url: "http://8.137.20.173:8001"
+
+  # 步骤1: 获取用户信息
+  user_info:
+    url: "${gateway.base_url}/user-info"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    # 响应提取: userId, mobile, uniqueId
+    extract:
+      user_id: "$.data.userId"
+      mobile: "$.data.mobile"
+      unique_id: "$.data.uniqueId"
+
+  # 步骤2: 获取临时 token
+  once_token:
+    url: "${gateway.base_url}/once-token"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    # 使用步骤1提取的用户信息
+    body_template: |
+      {
+        "userId": "{{ context.user_id }}",
+        "mobile": "{{ context.mobile }}",
+        "uniqueId": "{{ context.unique_id }}"
+      }
+    # 响应提取: 临时 token
+    extract:
+      temp_token: "$.data.token"
+
+  # 步骤3: 兑换正式 token
+  exchange_token:
+    url: "${gateway.base_url}/exchange-token"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    # 使用步骤2提取的临时 token
+    body_template: |
+      {
+        "token": "{{ context.temp_token }}"
+      }
+    # 响应提取: 正式 gateway token
+    extract:
+      gateway_token: "$.data.token"
+
+  # 应用到请求的头部配置
+  auth_header:
+    name: "Authorization"
+    value: "{{ context.gateway_token }}"

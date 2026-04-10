@@ -1,0 +1,48 @@
+task_id: "user_base_info_init"
+task_name: "初始化用户基础信息"
+task_type: "direct_insert"
+schedule: "0 2 * * *"
+enabled: true
+timeout: 300
+
+data_template:
+  table: "user_base_info"
+  batch_size: 100
+  total_count: 100
+
+  fields:
+    user_id:
+      type: "sequence"
+      start: 100000
+      step: 1
+    unique_id:
+      type: "faker"
+      generator: "uuid4"
+    mobile:
+      type: "faker"
+      generator: "phone_number"
+    name:
+      type: "faker"
+      generator: "name"
+    create_by:
+      type: "choice"
+      values: ["system", "admin", "batch"]
+      weights: [0.5, 0.3, 0.2]
+    update_by:
+      type: "choice"
+      values: ["system", "admin", "batch"]
+      weights: [0.5, 0.3, 0.2]
+
+execution:
+  iterations: 5
+  delay_ms: 100
+  continue_on_error: true
+
+tag_mapping:
+  user_id: "{{ user_id }}"
+  order_id: "N/A"
+  data_tag: "USER_BASE_INFO_INIT"
+
+target_db:
+  instance: "user_db_master"
+  database: "user"

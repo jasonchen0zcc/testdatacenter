@@ -1,0 +1,10 @@
+{
+  "userId": "{{ context.user_id }}",
+  "quantity": {{ quantity | default(1) }},
+  "goodsName": "{{ goods_name }}",
+  "goodsCode": "{{ goods_code }}",
+  "address": {
+    "province": "{{ address.province | default('广东省') }}",
+    "detail": "{{ address.detail | default('深圳市南山区科技园') }}"
+  }
+}

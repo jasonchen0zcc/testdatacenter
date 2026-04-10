@@ -1,3 +1,5 @@
+import asyncio
+
 import structlog
 
 from tdc.config.models import TaskConfig
@@ -93,9 +95,11 @@ class TaskRouter:
                     await engine.close()
 
     async def _execute_direct_insert(self, config: TaskConfig):
-        """执行直接插入任务"""
-        generator = DataGeneratorEngine(config.data_template)
-        records = generator.generate_all()
+        """执行直接插入任务（支持 execution.iterations 多次迭代）"""
+        execution_config = config.execution
+        iterations = execution_config.iterations if execution_config else 1
+        delay_ms = execution_config.delay_ms if execution_config else 0
+        continue_on_error = execution_config.continue_on_error if execution_config else True
 
         session_maker = self.pool_manager.get_session_maker(config.target_db.instance)
         async with session_maker() as session:
@@ -103,37 +107,72 @@ class TaskRouter:
                 inserter = BatchInserter(session, config.target_db.database, log_database="tdc")
                 ctx = Context(task_id=config.task_id)
 
+                # 计算总记录数
+                records_per_iteration = config.data_template.total_count
+                total_records = records_per_iteration * iterations
+
                 # 记录任务开始
                 log_id = await inserter.task_logger.start_task(
                     task_id=config.task_id,
                     task_name=config.task_name,
                     task_type=config.task_type.value,
-                    total_count=len(records)
+                    total_count=total_records
                 )
 
+                total_success = 0
+                total_failed = 0
+                error_msg = None
+
                 try:
-                    # 将 task_log_id 存入 context，供 insert_records 使用
                     ctx.set("_task_log_id", log_id)
-                    await inserter.insert_records(
-                        config.data_template.table,
-                        records,
-                        ctx,
-                        config.tag_mapping,
-                        task_log_id=log_id
-                    )
+
+                    for i in range(iterations):
+                        try:
+                            # 每次迭代重新创建引擎（确保数据不重复，如序列、UUID等）
+                            generator = DataGeneratorEngine(config.data_template)
+                            records = generator.generate_all()
+
+                            await inserter.insert_records(
+                                config.data_template.table,
+                                records,
+                                ctx,
+                                config.tag_mapping,
+                                task_log_id=log_id
+                            )
+                            total_success += len(records)
+
+                        except Exception as e:
+                            total_failed += records_per_iteration
+                            error_msg = f"Iteration {i + 1}/{iterations} failed: {str(e)[:200]}"
+                            logger.error("direct_insert_iteration_failed",
+                                         task_id=config.task_id,
+                                         iteration=i + 1,
+                                         error=str(e))
+                            if not continue_on_error:
+                                raise
+
+                        # 迭代间延迟（除了最后一次）
+                        if i < iterations - 1 and delay_ms > 0:
+                            await asyncio.sleep(delay_ms / 1000)
 
                     # 记录任务完成
                     await inserter.task_logger.complete_task(
-                        success_count=len(records),
-                        failed_count=0
+                        success_count=total_success,
+                        failed_count=total_failed,
+                        error_msg=error_msg if total_failed > 0 else None
                     )
 
-                    return {"success": True, "records_count": len(records)}
+                    return {
+                        "success": total_failed == 0,
+                        "records_count": total_success,
+                        "iterations": iterations,
+                        "failed_count": total_failed
+                    }
                 except Exception as e:
-                    # 记录任务失败
+                    # 记录任务失败（仅在 continue_on_error=False 时到达这里）
                     await inserter.task_logger.complete_task(
-                        success_count=0,
-                        failed_count=len(records),
+                        success_count=total_success,
+                        failed_count=total_records - total_success,
                         error_msg=str(e)[:500]
                     )
                     raise
